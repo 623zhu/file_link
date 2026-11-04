@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { onStateChanged } from "./api/events";
+import { LinkList } from "./components/LinkList";
+import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
 import { useStore } from "./store";
+import "./styles/app.css";
 
 function App() {
   const refresh = useStore((s) => s.refresh);
@@ -38,8 +41,12 @@ function App() {
   }, [refresh]);
 
   return (
-    <div style={{ fontFamily: '"Segoe UI", sans-serif' }}>
-      <Toolbar onToast={showToast} />
+    <div className="app">
+      <Sidebar />
+      <div className="main">
+        <Toolbar onToast={showToast} />
+        <LinkList />
+      </div>
       <Toast message={toast} onDismiss={dismissToast} />
     </div>
   );
