@@ -1,0 +1,37 @@
+# File Link 0.1.0
+
+免安装版：`FileLink_0.1.0_x64_portable.exe`
+
+SHA256：
+
+```
+B843FC7E4A52A811EC06CD06C9A2864D899F9DEC7B152597380DE4C6605D01AF
+```
+
+也可用同目录的 `SHA256SUMS.txt` 校验：
+
+```powershell
+Get-FileHash .\FileLink_0.1.0_x64_portable.exe -Algorithm SHA256
+```
+
+## 运行要求
+
+- Windows 10 / 11，x64
+- 已安装 WebView2 Runtime（Windows 11 自带；Windows 10 大多已随 Edge 安装）。若无法启动，请到微软官网安装「WebView2 Runtime」
+
+拷到任意目录双击即可运行，不需要安装 Node.js 或其它开发环境。链接数据写在 `%APPDATA%\com.filelink.app\`。
+
+## 本版本内容
+
+- 手动导入文件为链接；绑定文件夹后按类型规则生成链接
+- 自动导入或手动扫描新文件
+- 打开、在资源管理器中定位、移除链接（只删除链接，不删除原文件）
+- 搜索、多选批量操作、长列表虚拟滚动
+- 文件类型可配置；链接失效时标记「缺失」
+- 自定义应用图标；release 构建无控制台窗口
+
+## 已知问题
+
+- 可执行文件尚未代码签名。首次运行时，Windows SmartScreen 可能提示「Windows 已保护你的电脑」，可点「更多信息 → 仍要运行」
+- 免安装版不能自动补装 WebView2
+- 安装程序与代码签名安排在后续版本

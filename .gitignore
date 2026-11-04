@@ -14,6 +14,9 @@ src-tauri/target/
 src-tauri/gen/schemas
 src-tauri/WixTools/
 
+# Release binaries (notes and checksums are tracked)
+release/*.exe
+
 # Logs
 logs/
 *.log
