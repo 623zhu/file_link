@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use chrono::Local;
 use serde::Serialize;
-use tauri::{App, Emitter, Manager, Runtime};
+use tauri::{App, AppHandle, Emitter, Manager, Runtime};
 use uuid::Uuid;
 
 use crate::core::model::{Binding, Data, Ignore, Link, Settings, Source};
@@ -71,6 +71,12 @@ struct DataRecoveredPayload {
     backup_path: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BindingUnavailablePayload {
+    binding_id: String,
+}
+
 impl AppState {
     pub fn new(data: Data, data_path: PathBuf, recovery_path: Option<PathBuf>) -> Self {
         Self {
@@ -88,6 +94,32 @@ pub fn bootstrap<R: Runtime>(app: &App<R>) -> Result<(), AppError> {
     store::save(&data_path, &loaded.data)?;
     app.manage(AppState::new(loaded.data, data_path, loaded.backup_path));
     Ok(())
+}
+
+/// 启动补扫放到后台线程，不阻塞窗口显示。
+pub fn start_catch_up<R: Runtime>(app: AppHandle<R>) {
+    if let Err(err) = std::thread::Builder::new()
+        .name("startup-catch-up".into())
+        .spawn(move || {
+            let state = app.state::<AppState>();
+            match catch_up(&state) {
+                Ok(_) => {
+                    emit_unavailable_bindings(&state, &app);
+                    if let Err(err) = app.emit("state-changed", ()) {
+                        log::warn!("failed to emit state-changed after catch-up: {err}");
+                    }
+                }
+                Err(err) => log::error!("startup catch-up failed: {err}"),
+            }
+        })
+    {
+        log::error!("failed to spawn startup catch-up: {err}");
+    }
+}
+
+/// 对每个绑定对账、全量状态检查，并为开启自动导入的可用绑定启动监视。
+pub fn catch_up(state: &AppState) -> Result<ReconcileSummary, AppError> {
+    scan_all(state)
 }
 
 pub fn snapshot(state: &AppState) -> Result<Snapshot, AppError> {
@@ -363,17 +395,24 @@ fn reconcile_scanned(
             } else {
                 (files, false)
             };
-            let summary = write(state, |data| {
-                {
+            let (summary, recovered) = write(state, |data| {
+                let recovered = {
                     let current = data
                         .bindings
                         .iter_mut()
                         .find(|binding| binding.id == id)
                         .ok_or(AppError::NotFound)?;
+                    let was_unavailable = current.unavailable;
                     current.unavailable = false;
-                }
-                Ok(reconcile::reconcile(data, id, &files, file_exists))
+                    was_unavailable
+                };
+                let summary = reconcile::reconcile(data, id, &files, file_exists);
+                let binding = find_binding(data, id)?.clone();
+                Ok((summary, recovered.then_some(binding)))
             })?;
+            if let Some(binding) = recovered {
+                sync_watcher(state, &binding);
+            }
             if had_unstable {
                 state.watcher.schedule_reconcile(id, Duration::from_secs(2));
             }
@@ -386,6 +425,7 @@ fn reconcile_scanned(
                 }
                 Ok(())
             });
+            state.watcher.stop(id);
             Err(err)
         }
     }
@@ -406,7 +446,7 @@ pub fn scan_all(state: &AppState) -> Result<ReconcileSummary, AppError> {
         })
         .collect();
 
-    write(state, |data| {
+    let summary = write(state, |data| {
         let mut summary = ReconcileSummary::default();
         for (id, scanned) in &jobs {
             match scanned {
@@ -432,7 +472,9 @@ pub fn scan_all(state: &AppState) -> Result<ReconcileSummary, AppError> {
         }
         reconcile::refresh_missing(data, file_exists);
         Ok(summary)
-    })
+    })?;
+    sync_all_watchers(state);
+    Ok(summary)
 }
 
 fn find_binding<'a>(data: &'a Data, id: &str) -> Result<&'a Binding, AppError> {
@@ -468,13 +510,59 @@ fn scan_files(binding: &Binding, settings: &Settings) -> Result<Vec<(String, Str
     scanner::scan(&binding.path, binding.recursive, &rule).map_err(|_| AppError::BindingUnavailable)
 }
 
+fn sync_all_watchers(state: &AppState) {
+    let bindings = match lock(&state.data) {
+        Ok(data) => data.bindings.clone(),
+        Err(err) => {
+            log::error!("failed to read bindings to sync watchers: {err}");
+            return;
+        }
+    };
+    for binding in bindings {
+        sync_watcher(state, &binding);
+    }
+}
+
 fn sync_watcher(state: &AppState, binding: &Binding) {
+    if binding.unavailable {
+        state.watcher.stop(&binding.id);
+        return;
+    }
     if let Err(err) = state.watcher.restart(binding) {
         log::warn!(
             "failed to start folder watcher for {} at {}: {err}",
             binding.id,
             binding.path
         );
+    }
+}
+
+pub fn emit_binding_unavailable<R: Runtime, E: Emitter<R>>(emitter: &E, binding_id: &str) {
+    if let Err(err) = emitter.emit(
+        "binding-unavailable",
+        BindingUnavailablePayload {
+            binding_id: binding_id.to_string(),
+        },
+    ) {
+        log::warn!("failed to emit binding-unavailable: {err}");
+    }
+}
+
+pub fn emit_unavailable_bindings<R: Runtime, E: Emitter<R>>(state: &AppState, emitter: &E) {
+    let ids = match lock(&state.data) {
+        Ok(data) => data
+            .bindings
+            .iter()
+            .filter(|binding| binding.unavailable)
+            .map(|binding| binding.id.clone())
+            .collect::<Vec<_>>(),
+        Err(err) => {
+            log::warn!("failed to read unavailable bindings: {err}");
+            return;
+        }
+    };
+    for id in ids {
+        emit_binding_unavailable(emitter, &id);
     }
 }
 
@@ -937,6 +1025,185 @@ mod tests {
 
         assert!(unstable);
         assert!(kept.is_empty());
+    }
+
+    fn seed_binding(state: &AppState, dir: &Path, auto_watch: bool) -> Binding {
+        let (display, key) = path::normalize(dir).unwrap();
+        let binding = Binding {
+            id: Uuid::new_v4().to_string(),
+            path: display,
+            key,
+            recursive: false,
+            auto_watch,
+            rule_id: None,
+            created_at: Local::now(),
+            unavailable: false,
+        };
+        let saved = binding.clone();
+        write(state, |data| {
+            data.bindings.push(binding);
+            Ok(())
+        })
+        .unwrap();
+        saved
+    }
+
+    fn seed_link(state: &AppState, file: &Path, binding_id: &str) -> Link {
+        let (display, key) = path::normalize(file).unwrap();
+        let name = file.file_name().unwrap().to_string_lossy().into_owned();
+        let link = Link {
+            id: Uuid::new_v4().to_string(),
+            path: display,
+            key,
+            name,
+            sources: vec![Source::Binding {
+                binding_id: binding_id.to_string(),
+            }],
+            added_at: Local::now(),
+            missing: false,
+        };
+        let saved = link.clone();
+        write(state, |data| {
+            data.links.push(link);
+            Ok(())
+        })
+        .unwrap();
+        saved
+    }
+
+    #[test]
+    fn catch_up_imports_offline_changes_and_marks_missing() {
+        let files = tempfile::tempdir().unwrap();
+        let a = write_html(files.path(), "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let binding = seed_binding(&state, files.path(), true);
+        seed_link(&state, Path::new(&a), &binding.id);
+
+        write_html(files.path(), "b.html");
+        write_html(files.path(), "c.html");
+        fs::remove_file(&a).unwrap();
+
+        let summary = catch_up(&state).unwrap();
+        let snap = snapshot(&state).unwrap();
+
+        assert_eq!(summary.added, 2);
+        assert_eq!(summary.missing, 1);
+        assert_eq!(snap.links.len(), 3);
+        assert!(
+            snap.links
+                .iter()
+                .any(|link| link.name == "a.html" && link.missing)
+        );
+        assert!(
+            snap.links
+                .iter()
+                .any(|link| link.name == "b.html" && !link.missing)
+        );
+        assert!(
+            snap.links
+                .iter()
+                .any(|link| link.name == "c.html" && !link.missing)
+        );
+        assert!(state.watcher.is_watching(&binding.id));
+        state.watcher.stop(&binding.id);
+    }
+
+    #[test]
+    fn catch_up_marks_missing_folder_unavailable_and_skips_watcher() {
+        let root = tempfile::tempdir().unwrap();
+        let bound = root.path().join("bound");
+        fs::create_dir(&bound).unwrap();
+        write_html(&bound, "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let binding = seed_binding(&state, &bound, true);
+
+        fs::rename(&bound, root.path().join("away")).unwrap();
+        catch_up(&state).unwrap();
+
+        let snap = snapshot(&state).unwrap();
+        let current = snap
+            .bindings
+            .iter()
+            .find(|item| item.id == binding.id)
+            .unwrap();
+        assert!(current.unavailable);
+        assert!(!state.watcher.is_watching(&binding.id));
+        assert!(snap.links.is_empty());
+    }
+
+    #[test]
+    fn catch_up_does_not_start_watcher_when_auto_watch_is_off() {
+        let dir = tempfile::tempdir().unwrap();
+        write_html(dir.path(), "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let binding = seed_binding(&state, dir.path(), false);
+
+        catch_up(&state).unwrap();
+
+        assert_eq!(snapshot(&state).unwrap().links.len(), 1);
+        assert!(!state.watcher.is_watching(&binding.id));
+    }
+
+    #[test]
+    fn scan_binding_recovers_unavailable_folder_and_restarts_watcher() {
+        let root = tempfile::tempdir().unwrap();
+        let bound = root.path().join("bound");
+        fs::create_dir(&bound).unwrap();
+        write_html(&bound, "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let added = add_binding(&state, &bound.to_string_lossy(), false, true).unwrap();
+        let id = added.binding.id.clone();
+        assert!(state.watcher.is_watching(&id));
+
+        let away = root.path().join("away");
+        fs::rename(&bound, &away).unwrap();
+        let err = scan_binding(&state, &id).unwrap_err();
+        assert!(matches!(err, AppError::BindingUnavailable));
+        assert!(
+            snapshot(&state)
+                .unwrap()
+                .bindings
+                .iter()
+                .any(|binding| binding.id == id && binding.unavailable)
+        );
+        assert!(!state.watcher.is_watching(&id));
+
+        fs::rename(&away, &bound).unwrap();
+        scan_binding(&state, &id).unwrap();
+        let current = snapshot(&state)
+            .unwrap()
+            .bindings
+            .iter()
+            .find(|binding| binding.id == id)
+            .unwrap()
+            .clone();
+        assert!(!current.unavailable);
+        assert!(state.watcher.is_watching(&id));
+        state.watcher.stop(&id);
+    }
+
+    #[test]
+    fn scan_all_stops_watcher_when_folder_becomes_unavailable() {
+        let root = tempfile::tempdir().unwrap();
+        let bound = root.path().join("bound");
+        fs::create_dir(&bound).unwrap();
+        write_html(&bound, "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let added = add_binding(&state, &bound.to_string_lossy(), false, true).unwrap();
+        let id = added.binding.id.clone();
+        assert!(state.watcher.is_watching(&id));
+
+        fs::rename(&bound, root.path().join("away")).unwrap();
+        scan_all(&state).unwrap();
+
+        assert!(
+            snapshot(&state)
+                .unwrap()
+                .bindings
+                .iter()
+                .any(|binding| binding.id == id && binding.unavailable)
+        );
+        assert!(!state.watcher.is_watching(&id));
     }
 
     #[test]

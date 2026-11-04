@@ -96,6 +96,9 @@ pub fn update_binding(
     auto_watch: Option<bool>,
 ) -> Result<Binding, AppError> {
     let result = service::update_binding(&state, &id, recursive, auto_watch)?;
+    if result.unavailable {
+        service::emit_binding_unavailable(&app, &result.id);
+    }
     emit_state_changed(&app)?;
     Ok(result)
 }
@@ -117,14 +120,25 @@ pub fn scan_binding(
     state: State<AppState>,
     id: String,
 ) -> Result<ReconcileSummary, AppError> {
-    let result = service::scan_binding(&state, &id)?;
-    emit_state_changed(&app)?;
-    Ok(result)
+    match service::scan_binding(&state, &id) {
+        Ok(result) => {
+            emit_state_changed(&app)?;
+            Ok(result)
+        }
+        Err(err) => {
+            if matches!(err, AppError::BindingUnavailable) {
+                service::emit_binding_unavailable(&app, &id);
+                let _ = emit_state_changed(&app);
+            }
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
 pub fn scan_all(app: AppHandle, state: State<AppState>) -> Result<ReconcileSummary, AppError> {
     let result = service::scan_all(&state)?;
+    service::emit_unavailable_bindings(&state, &app);
     emit_state_changed(&app)?;
     Ok(result)
 }

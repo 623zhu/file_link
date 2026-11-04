@@ -171,6 +171,12 @@ fn handle_watch_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
         Err(AppError::NotFound) => {
             log::debug!("skip auto reconcile for removed binding {id}");
         }
+        Err(AppError::BindingUnavailable) => {
+            service::emit_binding_unavailable(app, id);
+            if let Err(err) = app.emit("state-changed", ()) {
+                log::warn!("failed to emit state-changed: {err}");
+            }
+        }
         Err(err) => {
             log::warn!("auto reconcile failed for {id}: {err}");
         }
