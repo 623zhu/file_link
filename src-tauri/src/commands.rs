@@ -1,10 +1,16 @@
+use std::io;
 use std::path::Path;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::core::model::Binding;
+use crate::core::reconcile::ReconcileSummary;
 use crate::error::AppError;
-use crate::service::{self, AppState, ImportResult, RemoveLinksResult, Snapshot};
+use crate::service::{
+    self, AddBindingResult, AppState, ImportResult, PreviewBindingResult, RemoveBindingResult,
+    RemoveLinksResult, Snapshot,
+};
 
 #[tauri::command]
 pub fn get_snapshot(app: AppHandle, state: State<AppState>) -> Result<Snapshot, AppError> {
@@ -57,6 +63,75 @@ pub fn remove_links(
     ids: Vec<String>,
 ) -> Result<RemoveLinksResult, AppError> {
     service::write_and_emit(&state, &app, |data| Ok(service::remove_links(data, &ids)))
+}
+
+#[tauri::command]
+pub fn preview_binding(
+    state: State<AppState>,
+    path: String,
+    recursive: bool,
+) -> Result<PreviewBindingResult, AppError> {
+    service::preview_binding(&state, &path, recursive)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub fn add_binding(
+    app: AppHandle,
+    state: State<AppState>,
+    path: String,
+    recursive: bool,
+    auto_watch: bool,
+) -> Result<AddBindingResult, AppError> {
+    let result = service::add_binding(&state, &path, recursive, auto_watch)?;
+    emit_state_changed(&app)?;
+    Ok(result)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub fn update_binding(
+    app: AppHandle,
+    state: State<AppState>,
+    id: String,
+    recursive: Option<bool>,
+    auto_watch: Option<bool>,
+) -> Result<Binding, AppError> {
+    let result = service::update_binding(&state, &id, recursive, auto_watch)?;
+    emit_state_changed(&app)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn remove_binding(
+    app: AppHandle,
+    state: State<AppState>,
+    id: String,
+) -> Result<RemoveBindingResult, AppError> {
+    let result = service::remove_binding(&state, &id)?;
+    emit_state_changed(&app)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn scan_binding(
+    app: AppHandle,
+    state: State<AppState>,
+    id: String,
+) -> Result<ReconcileSummary, AppError> {
+    let result = service::scan_binding(&state, &id)?;
+    emit_state_changed(&app)?;
+    Ok(result)
+}
+
+#[tauri::command]
+pub fn scan_all(app: AppHandle, state: State<AppState>) -> Result<ReconcileSummary, AppError> {
+    let result = service::scan_all(&state)?;
+    emit_state_changed(&app)?;
+    Ok(result)
+}
+
+fn emit_state_changed(app: &AppHandle) -> Result<(), AppError> {
+    app.emit("state-changed", ())
+        .map_err(|err| AppError::Io(io::Error::other(err.to_string())))
 }
 
 fn open_failed(err: impl ToString) -> AppError {

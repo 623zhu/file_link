@@ -37,6 +37,12 @@ pub fn run() {
             commands::open_link,
             commands::reveal_link,
             commands::remove_links,
+            commands::preview_binding,
+            commands::add_binding,
+            commands::update_binding,
+            commands::remove_binding,
+            commands::scan_binding,
+            commands::scan_all,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

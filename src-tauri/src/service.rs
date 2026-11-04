@@ -9,6 +9,9 @@ use uuid::Uuid;
 
 use crate::core::model::{Binding, Data, Ignore, Link, Settings, Source};
 use crate::core::path;
+use crate::core::reconcile::{self, ReconcileSummary};
+use crate::core::rule;
+use crate::core::scanner;
 use crate::core::store;
 use crate::error::AppError;
 
@@ -37,6 +40,25 @@ pub struct ImportResult {
 #[serde(rename_all = "camelCase")]
 pub struct RemoveLinksResult {
     pub removed: usize,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewBindingResult {
+    pub count: usize,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AddBindingResult {
+    pub binding: Binding,
+    pub added: usize,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveBindingResult {
+    pub removed_links: usize,
 }
 
 #[derive(Clone, Serialize)]
@@ -198,6 +220,218 @@ pub fn remove_links(data: &mut Data, ids: &[String]) -> RemoveLinksResult {
     RemoveLinksResult {
         removed: before - data.links.len(),
     }
+}
+
+pub fn preview_binding(
+    state: &AppState,
+    raw_path: &str,
+    recursive: bool,
+) -> Result<PreviewBindingResult, AppError> {
+    let (display, key) = normalize_dir(raw_path)?;
+    let settings = lock(&state.data)?.settings.clone();
+    let binding = new_binding(display.clone(), key, recursive, false);
+    let files = scan_files(&binding, &settings)?;
+    Ok(PreviewBindingResult { count: files.len() })
+}
+
+pub fn add_binding(
+    state: &AppState,
+    raw_path: &str,
+    recursive: bool,
+    auto_watch: bool,
+) -> Result<AddBindingResult, AppError> {
+    let (display, key) = normalize_dir(raw_path)?;
+    let settings = {
+        let data = lock(&state.data)?;
+        if data.bindings.iter().any(|binding| binding.key == key) {
+            return Err(AppError::BindingExists);
+        }
+        data.settings.clone()
+    };
+    let binding = new_binding(display, key, recursive, auto_watch);
+    let files = scan_files(&binding, &settings)?;
+    write(state, |data| {
+        if data
+            .bindings
+            .iter()
+            .any(|existing| existing.key == binding.key)
+        {
+            return Err(AppError::BindingExists);
+        }
+        let added_binding = binding.clone();
+        data.bindings.push(binding);
+        let summary = reconcile::reconcile(data, &added_binding.id, &files, file_exists);
+        Ok(AddBindingResult {
+            binding: added_binding,
+            added: summary.added,
+        })
+    })
+}
+
+pub fn update_binding(
+    state: &AppState,
+    id: &str,
+    recursive: Option<bool>,
+    auto_watch: Option<bool>,
+) -> Result<Binding, AppError> {
+    let (mut binding, settings) = {
+        let data = lock(&state.data)?;
+        (find_binding(&data, id)?.clone(), data.settings.clone())
+    };
+    if let Some(recursive) = recursive {
+        binding.recursive = recursive;
+    }
+    if let Some(auto_watch) = auto_watch {
+        binding.auto_watch = auto_watch;
+    }
+    let files = if recursive.is_some() {
+        Some(scan_files(&binding, &settings))
+    } else {
+        None
+    };
+
+    write(state, |data| {
+        {
+            let current = data
+                .bindings
+                .iter_mut()
+                .find(|binding| binding.id == id)
+                .ok_or(AppError::NotFound)?;
+            current.recursive = binding.recursive;
+            current.auto_watch = binding.auto_watch;
+            match &files {
+                Some(Ok(_)) => current.unavailable = false,
+                Some(Err(_)) => current.unavailable = true,
+                None => {}
+            }
+        }
+        if let Some(Ok(files)) = &files {
+            reconcile::reconcile(data, id, files, file_exists);
+        }
+        find_binding(data, id).cloned()
+    })
+}
+
+pub fn remove_binding(state: &AppState, id: &str) -> Result<RemoveBindingResult, AppError> {
+    write(state, |data| {
+        if !data.bindings.iter().any(|binding| binding.id == id) {
+            return Err(AppError::NotFound);
+        }
+        data.bindings.retain(|binding| binding.id != id);
+        Ok(RemoveBindingResult {
+            removed_links: reconcile::unbind(data, id),
+        })
+    })
+}
+
+pub fn scan_binding(state: &AppState, id: &str) -> Result<ReconcileSummary, AppError> {
+    let (binding, settings) = {
+        let data = lock(&state.data)?;
+        (find_binding(&data, id)?.clone(), data.settings.clone())
+    };
+    match scan_files(&binding, &settings) {
+        Ok(files) => write(state, |data| {
+            {
+                let current = data
+                    .bindings
+                    .iter_mut()
+                    .find(|binding| binding.id == id)
+                    .ok_or(AppError::NotFound)?;
+                current.unavailable = false;
+            }
+            Ok(reconcile::reconcile(data, id, &files, file_exists))
+        }),
+        Err(err) => {
+            let _ = write(state, |data| {
+                if let Some(current) = data.bindings.iter_mut().find(|binding| binding.id == id) {
+                    current.unavailable = true;
+                }
+                Ok(())
+            });
+            Err(err)
+        }
+    }
+}
+
+pub fn scan_all(state: &AppState) -> Result<ReconcileSummary, AppError> {
+    let (settings, bindings) = {
+        let data = lock(&state.data)?;
+        (data.settings.clone(), data.bindings.clone())
+    };
+    let jobs: Vec<_> = bindings
+        .iter()
+        .map(|binding| {
+            (
+                binding.id.clone(),
+                scan_files(binding, &settings).map_err(|_| ()),
+            )
+        })
+        .collect();
+
+    write(state, |data| {
+        let mut summary = ReconcileSummary::default();
+        for (id, scanned) in &jobs {
+            match scanned {
+                Ok(files) => {
+                    if let Some(binding) =
+                        data.bindings.iter_mut().find(|binding| binding.id == *id)
+                    {
+                        binding.unavailable = false;
+                    }
+                    let part = reconcile::reconcile(data, id, files, file_exists);
+                    summary.added += part.added;
+                    summary.restored += part.restored;
+                    summary.missing += part.missing;
+                }
+                Err(()) => {
+                    if let Some(binding) =
+                        data.bindings.iter_mut().find(|binding| binding.id == *id)
+                    {
+                        binding.unavailable = true;
+                    }
+                }
+            }
+        }
+        reconcile::refresh_missing(data, file_exists);
+        Ok(summary)
+    })
+}
+
+fn find_binding<'a>(data: &'a Data, id: &str) -> Result<&'a Binding, AppError> {
+    data.bindings
+        .iter()
+        .find(|binding| binding.id == id)
+        .ok_or(AppError::NotFound)
+}
+
+fn normalize_dir(raw: &str) -> Result<(String, String), AppError> {
+    let (display, key) = path::normalize(raw).map_err(|_| AppError::BindingUnavailable)?;
+    if !Path::new(&display).is_dir() {
+        return Err(AppError::BindingUnavailable);
+    }
+    Ok((display, key))
+}
+
+fn new_binding(display: String, key: String, recursive: bool, auto_watch: bool) -> Binding {
+    Binding {
+        id: Uuid::new_v4().to_string(),
+        path: display,
+        key,
+        recursive,
+        auto_watch,
+        rule_id: None,
+        created_at: Local::now(),
+        unavailable: false,
+    }
+}
+
+fn scan_files(binding: &Binding, settings: &Settings) -> Result<Vec<(String, String)>, AppError> {
+    let rule = rule::effective_rule(binding, settings);
+    scanner::scan(&binding.path, binding.recursive, &rule).map_err(|_| AppError::BindingUnavailable)
+}
+
+fn file_exists(path: &str) -> bool {
+    Path::new(path).is_file()
 }
 
 pub fn emit_recovery_if_needed<R: Runtime, E: Emitter<R>>(
@@ -470,6 +704,82 @@ mod tests {
                     key: "d:\\files\\bound.html".to_string(),
                 },
             ]
+        );
+    }
+
+    #[test]
+    fn add_binding_rejects_duplicate_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        write_html(dir.path(), "a.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let path = dir.path().to_string_lossy().into_owned();
+
+        add_binding(&state, &path, false, false).unwrap();
+        let err = add_binding(&state, &path, true, true).unwrap_err();
+
+        assert!(matches!(err, AppError::BindingExists));
+        assert_eq!(snapshot(&state).unwrap().bindings.len(), 1);
+    }
+
+    #[test]
+    fn update_binding_recursive_changes_reconcile_results() {
+        let dir = tempfile::tempdir().unwrap();
+        write_html(dir.path(), "root.html");
+        let nested = dir.path().join("sub");
+        fs::create_dir(&nested).unwrap();
+        write_html(&nested, "nested.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        let path = dir.path().to_string_lossy().into_owned();
+
+        let added = add_binding(&state, &path, false, false).unwrap();
+        assert_eq!(added.added, 1);
+        assert_eq!(snapshot(&state).unwrap().links.len(), 1);
+
+        let updated = update_binding(&state, &added.binding.id, Some(true), None).unwrap();
+        assert!(updated.recursive);
+        let names: Vec<_> = snapshot(&state)
+            .unwrap()
+            .links
+            .iter()
+            .map(|link| link.name.clone())
+            .collect();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"root.html".to_string()));
+        assert!(names.contains(&"nested.html".to_string()));
+    }
+
+    #[test]
+    fn scan_all_continues_when_one_binding_is_unavailable() {
+        let ok_dir = tempfile::tempdir().unwrap();
+        write_html(ok_dir.path(), "ok.html");
+        let gone_dir = tempfile::tempdir().unwrap();
+        write_html(gone_dir.path(), "gone.html");
+        let (_data_dir, state) = temp_state(Data::default());
+
+        let ok = add_binding(&state, &ok_dir.path().to_string_lossy(), false, false).unwrap();
+        let gone = add_binding(&state, &gone_dir.path().to_string_lossy(), false, false).unwrap();
+        drop(gone_dir);
+
+        let summary = scan_all(&state).unwrap();
+        let snap = snapshot(&state).unwrap();
+        let gone_binding = snap
+            .bindings
+            .iter()
+            .find(|binding| binding.id == gone.binding.id)
+            .unwrap();
+        let ok_binding = snap
+            .bindings
+            .iter()
+            .find(|binding| binding.id == ok.binding.id)
+            .unwrap();
+
+        assert!(gone_binding.unavailable);
+        assert!(!ok_binding.unavailable);
+        assert_eq!(summary.added, 0);
+        assert!(
+            snap.links
+                .iter()
+                .any(|link| link.name == "ok.html" && !link.missing)
         );
     }
 }
