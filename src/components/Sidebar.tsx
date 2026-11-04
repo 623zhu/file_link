@@ -5,6 +5,7 @@ import { removeBinding, scanBinding, updateBinding } from "../api/commands";
 import { useStore } from "../store";
 import type { AppError, Binding, View } from "../types";
 import { hasBindingSource, hasManualSource } from "../utils/filter";
+import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 interface SidebarProps {
@@ -52,6 +53,19 @@ export function Sidebar({ onToast }: SidebarProps) {
       onToast(
         `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
       );
+    } catch (err) {
+      onToast(errorMessage(err));
+    }
+  }
+
+  async function handleToggleAutoWatch(binding: Binding) {
+    setMenu(null);
+    const next = !binding.autoWatch;
+    try {
+      await updateBinding(binding.id, { autoWatch: next });
+      if (next && isNetworkPath(binding.path)) {
+        onToast(NETWORK_WATCH_HINT);
+      }
     } catch (err) {
       onToast(errorMessage(err));
     }
@@ -111,27 +125,34 @@ export function Sidebar({ onToast }: SidebarProps) {
       <div className="sidebar-group">
         <div className="sidebar-group-title">文件夹</div>
         {bindings.map((binding) => (
-          <SidebarItem
-            key={binding.id}
-            label={folderName(binding.path)}
-            count={
-              links?.filter((link) => hasBindingSource(link, binding.id))
-                .length ?? 0
-            }
-            active={view.type === "binding" && view.id === binding.id}
-            title={binding.path}
-            onSelect={() => setView({ type: "binding", id: binding.id })}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              setView({ type: "binding", id: binding.id });
-              setMenu({
-                binding,
-                x: Math.min(event.clientX, window.innerWidth - 220),
-                y: Math.min(event.clientY, window.innerHeight - 180),
-              });
-            }}
-          />
+          <div key={binding.id}>
+            <SidebarItem
+              label={folderName(binding.path)}
+              count={
+                links?.filter((link) => hasBindingSource(link, binding.id))
+                  .length ?? 0
+              }
+              active={view.type === "binding" && view.id === binding.id}
+              unavailable={binding.unavailable}
+              title={binding.path}
+              onSelect={() => setView({ type: "binding", id: binding.id })}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setView({ type: "binding", id: binding.id });
+                setMenu({
+                  binding,
+                  x: Math.min(event.clientX, window.innerWidth - 220),
+                  y: Math.min(event.clientY, window.innerHeight - 220),
+                });
+              }}
+            />
+            {binding.autoWatch &&
+            isNetworkPath(binding.path) &&
+            !binding.unavailable ? (
+              <p className="sidebar-hint">{NETWORK_WATCH_HINT}</p>
+            ) : null}
+          </div>
         ))}
       </div>
       {menu ? (
@@ -146,6 +167,13 @@ export function Sidebar({ onToast }: SidebarProps) {
             onClick={() => void handleScan(menu.binding)}
           >
             扫描
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleToggleAutoWatch(menu.binding)}
+          >
+            {menu.binding.autoWatch ? "✓ 自动导入" : "自动导入"}
           </button>
           <button
             type="button"
@@ -188,6 +216,7 @@ function SidebarItem({
   label,
   count,
   active,
+  unavailable,
   title,
   onSelect,
   onContextMenu,
@@ -195,14 +224,22 @@ function SidebarItem({
   label: string;
   count: number;
   active: boolean;
+  unavailable?: boolean;
   title?: string;
   onSelect: () => void;
   onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
+  const className = [
+    "sidebar-item",
+    active ? "active" : "",
+    unavailable ? "unavailable" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return (
     <button
       type="button"
-      className={active ? "sidebar-item active" : "sidebar-item"}
+      className={className}
       aria-current={active ? "page" : undefined}
       title={title}
       onClick={onSelect}
@@ -218,18 +255,18 @@ function SidebarItem({
       >
         {label}
       </span>
-      <span className="sidebar-count">{count}</span>
+      <span className="sidebar-item-end">
+        {unavailable ? (
+          <span className="sidebar-status">目录不可用</span>
+        ) : null}
+        <span className="sidebar-count">{count}</span>
+      </span>
     </button>
   );
 }
 
 function setView(view: View) {
   useStore.setState({ view });
-}
-
-function folderName(path: string): string {
-  const parts = path.split(/[\\/]/).filter((part) => part.length > 0);
-  return parts[parts.length - 1] ?? path;
 }
 
 function errorMessage(err: unknown, fallback = "操作失败"): string {

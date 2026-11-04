@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { onStateChanged } from "./api/events";
+import { subscribeWatcherEvents } from "./api/events";
 import { LinkList } from "./components/LinkList";
 import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
 import { useStore } from "./store";
+import { autoImportedMessage } from "./utils/path";
 import "./styles/app.css";
 
 function App() {
@@ -24,8 +25,32 @@ function App() {
 
     void refresh();
 
-    void onStateChanged(() => {
-      void refresh();
+    void subscribeWatcherEvents({
+      onStateChanged: () => {
+        void refresh();
+      },
+      onAutoImported: (payload) => {
+        const binding = useStore
+          .getState()
+          .snapshot?.bindings.find((item) => item.id === payload.bindingId);
+        showToast(autoImportedMessage(binding?.path, payload.added));
+      },
+      onBindingUnavailable: (payload) => {
+        const snapshot = useStore.getState().snapshot;
+        if (snapshot) {
+          useStore.setState({
+            snapshot: {
+              ...snapshot,
+              bindings: snapshot.bindings.map((binding) =>
+                binding.id === payload.bindingId
+                  ? { ...binding, unavailable: true }
+                  : binding,
+              ),
+            },
+          });
+        }
+        void refresh();
+      },
     }).then((fn) => {
       if (cancelled) {
         fn();
@@ -38,7 +63,7 @@ function App() {
       cancelled = true;
       unlisten?.();
     };
-  }, [refresh]);
+  }, [refresh, showToast]);
 
   return (
     <div className="app">

@@ -10,7 +10,7 @@ export function Toast({ message, onDismiss }: ToastProps) {
     if (!message) {
       return;
     }
-    const timer = window.setTimeout(onDismiss, 4000);
+    const timer = window.setTimeout(onDismiss, 5000);
     return () => window.clearTimeout(timer);
   }, [message, onDismiss]);
 
@@ -26,11 +26,13 @@ export function Toast({ message, onDismiss }: ToastProps) {
         left: "50%",
         bottom: 24,
         transform: "translateX(-50%)",
+        maxWidth: "min(480px, calc(100% - 32px))",
         padding: "10px 16px",
         borderRadius: 6,
         background: "#1f2937",
         color: "#fff",
         fontSize: 14,
+        lineHeight: 1.5,
         boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
         zIndex: 1000,
       }}

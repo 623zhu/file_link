@@ -35,3 +35,20 @@ export function onDataRecovered(
     handler(event.payload);
   });
 }
+
+export async function subscribeWatcherEvents(handlers: {
+  onStateChanged: () => void;
+  onAutoImported: (payload: AutoImportedPayload) => void;
+  onBindingUnavailable: (payload: BindingUnavailablePayload) => void;
+}): Promise<UnlistenFn> {
+  const unlistens = await Promise.all([
+    onStateChanged(handlers.onStateChanged),
+    onAutoImported(handlers.onAutoImported),
+    onBindingUnavailable(handlers.onBindingUnavailable),
+  ]);
+  return () => {
+    for (const unlisten of unlistens) {
+      unlisten();
+    }
+  };
+}

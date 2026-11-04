@@ -64,9 +64,37 @@ button {
   font-weight: 600;
 }
 
+.sidebar-item.unavailable {
+  color: #9ca3af;
+}
+
+.sidebar-item-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.sidebar-status {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 500;
+}
+
 .sidebar-count {
   color: #6b7280;
   font-variant-numeric: tabular-nums;
+}
+
+.sidebar-hint {
+  margin: 0;
+  padding: 0 16px 8px;
+  color: #b45309;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .sidebar-group {
@@ -99,10 +127,9 @@ button {
 .link-header,
 .link-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 2fr) minmax(
-      88px,
-      0.9fr
-    ) 108px;
+  grid-template-columns:
+    minmax(140px, 1.2fr) minmax(180px, 2fr) minmax(88px, 0.9fr)
+    108px;
   gap: 8px;
   align-items: center;
   padding: 0 16px;
