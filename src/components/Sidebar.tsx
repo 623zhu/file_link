@@ -1,12 +1,98 @@
-import { hasManualSource } from "../utils/filter";
-import { useStore } from "../store";
-import type { View } from "../types";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useState, type MouseEvent } from "react";
 
-export function Sidebar() {
+import { removeBinding, scanBinding, updateBinding } from "../api/commands";
+import { useStore } from "../store";
+import type { AppError, Binding, View } from "../types";
+import { hasBindingSource, hasManualSource } from "../utils/filter";
+import { ConfirmDialog } from "./ConfirmDialog";
+
+interface SidebarProps {
+  onToast: (message: string) => void;
+}
+
+interface MenuState {
+  binding: Binding;
+  x: number;
+  y: number;
+}
+
+const UNBIND_MESSAGE =
+  "解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留，磁盘上的原文件不受影响。";
+
+export function Sidebar({ onToast }: SidebarProps) {
   const links = useStore((state) => state.snapshot?.links);
+  const bindings = useStore((state) => state.snapshot?.bindings) ?? [];
   const view = useStore((state) => state.view);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [unbinding, setUnbinding] = useState<Binding | null>(null);
+
   const allCount = links?.length ?? 0;
   const manualCount = links?.filter(hasManualSource).length ?? 0;
+
+  useEffect(() => {
+    if (!menu) {
+      return;
+    }
+    function close() {
+      setMenu(null);
+    }
+    window.addEventListener("click", close);
+    window.addEventListener("contextmenu", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("contextmenu", close, true);
+    };
+  }, [menu]);
+
+  async function handleScan(binding: Binding) {
+    setMenu(null);
+    try {
+      const summary = await scanBinding(binding.id);
+      onToast(
+        `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
+      );
+    } catch (err) {
+      onToast(errorMessage(err));
+    }
+  }
+
+  async function handleToggleRecursive(binding: Binding) {
+    setMenu(null);
+    try {
+      await updateBinding(binding.id, { recursive: !binding.recursive });
+    } catch (err) {
+      onToast(errorMessage(err));
+    }
+  }
+
+  async function handleOpenFolder(binding: Binding) {
+    setMenu(null);
+    try {
+      await invoke("plugin:opener|open_path", {
+        path: binding.path,
+        with: null,
+      });
+    } catch (err) {
+      onToast(errorMessage(err, "无法在资源管理器中打开该文件夹"));
+    }
+  }
+
+  async function handleUnbind() {
+    if (!unbinding) {
+      return;
+    }
+    const id = unbinding.id;
+    setUnbinding(null);
+    try {
+      await removeBinding(id);
+      if (view.type === "binding" && view.id === id) {
+        setView({ type: "all" });
+      }
+    } catch (err) {
+      onToast(errorMessage(err));
+    }
+  }
 
   return (
     <nav className="sidebar" aria-label="链接来源">
@@ -24,7 +110,76 @@ export function Sidebar() {
       />
       <div className="sidebar-group">
         <div className="sidebar-group-title">文件夹</div>
+        {bindings.map((binding) => (
+          <SidebarItem
+            key={binding.id}
+            label={folderName(binding.path)}
+            count={
+              links?.filter((link) => hasBindingSource(link, binding.id))
+                .length ?? 0
+            }
+            active={view.type === "binding" && view.id === binding.id}
+            title={binding.path}
+            onSelect={() => setView({ type: "binding", id: binding.id })}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setView({ type: "binding", id: binding.id });
+              setMenu({
+                binding,
+                x: Math.min(event.clientX, window.innerWidth - 220),
+                y: Math.min(event.clientY, window.innerHeight - 180),
+              });
+            }}
+          />
+        ))}
       </div>
+      {menu ? (
+        <div
+          className="context-menu"
+          style={{ left: menu.x, top: menu.y }}
+          role="menu"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleScan(menu.binding)}
+          >
+            扫描
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleToggleRecursive(menu.binding)}
+          >
+            {menu.binding.recursive ? "✓ 包含子文件夹" : "包含子文件夹"}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => void handleOpenFolder(menu.binding)}
+          >
+            在资源管理器中打开
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setUnbinding(menu.binding);
+              setMenu(null);
+            }}
+          >
+            解除绑定
+          </button>
+        </div>
+      ) : null}
+      <ConfirmDialog
+        open={unbinding != null}
+        message={UNBIND_MESSAGE}
+        confirmLabel="解除绑定"
+        onConfirm={() => void handleUnbind()}
+        onCancel={() => setUnbinding(null)}
+      />
     </nav>
   );
 }
@@ -33,21 +188,36 @@ function SidebarItem({
   label,
   count,
   active,
+  title,
   onSelect,
+  onContextMenu,
 }: {
   label: string;
   count: number;
   active: boolean;
+  title?: string;
   onSelect: () => void;
+  onContextMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <button
       type="button"
       className={active ? "sidebar-item active" : "sidebar-item"}
       aria-current={active ? "page" : undefined}
+      title={title}
       onClick={onSelect}
+      onContextMenu={onContextMenu}
     >
-      <span>{label}</span>
+      <span
+        style={{
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </span>
       <span className="sidebar-count">{count}</span>
     </button>
   );
@@ -55,4 +225,19 @@ function SidebarItem({
 
 function setView(view: View) {
   useStore.setState({ view });
+}
+
+function folderName(path: string): string {
+  const parts = path.split(/[\\/]/).filter((part) => part.length > 0);
+  return parts[parts.length - 1] ?? path;
+}
+
+function errorMessage(err: unknown, fallback = "操作失败"): string {
+  if (err && typeof err === "object" && "message" in err) {
+    const message = (err as AppError).message;
+    if (typeof message === "string" && message.length > 0) {
+      return message;
+    }
+  }
+  return fallback;
 }

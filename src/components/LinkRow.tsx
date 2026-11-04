@@ -71,6 +71,8 @@ export function LinkRow({ link, bindings, onToast }: LinkRowProps) {
     }
   }
 
+  const source = sourceLabel(link.sources, bindings);
+
   return (
     <div
       className={link.missing ? "link-row missing" : "link-row"}
@@ -93,7 +95,9 @@ export function LinkRow({ link, bindings, onToast }: LinkRowProps) {
       <div className="link-cell" title={link.path}>
         {link.path}
       </div>
-      <div className="link-cell">{sourceLabel(link.sources, bindings)}</div>
+      <div className="link-cell" title={source}>
+        {source}
+      </div>
       <div className="link-cell">{formatAddedAt(link.addedAt)}</div>
       {menu ? (
         <div

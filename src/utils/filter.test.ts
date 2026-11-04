@@ -17,12 +17,14 @@ function link(id: string, sources: Source[], missing = false): Link {
 
 const manual: Source = { type: "manual" };
 const binding: Source = { type: "binding", bindingId: "b1" };
+const otherBinding: Source = { type: "binding", bindingId: "b2" };
 
 const links: Link[] = [
   link("only-manual", [manual]),
   link("only-binding", [binding]),
   link("both", [manual, binding]),
   link("missing-manual", [manual], true),
+  link("other-binding", [otherBinding]),
 ];
 
 describe("filterLinks", () => {
@@ -35,6 +37,19 @@ describe("filterLinks", () => {
       links[0],
       links[2],
       links[3],
+    ]);
+  });
+
+  it("keeps links that include the selected binding", () => {
+    expect(filterLinks(links, { type: "binding", id: "b1" })).toEqual([
+      links[1],
+      links[2],
+    ]);
+  });
+
+  it("excludes links that only belong to another binding", () => {
+    expect(filterLinks(links, { type: "binding", id: "b2" })).toEqual([
+      links[4],
     ]);
   });
 });

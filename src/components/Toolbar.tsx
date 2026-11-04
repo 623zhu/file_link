@@ -1,9 +1,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 
-import { importFiles } from "../api/commands";
+import { importFiles, scanAll } from "../api/commands";
 import { useStore } from "../store";
 import type { AppError } from "../types";
+import { BindDialog } from "./BindDialog";
 
 const DEFAULT_EXTENSIONS = [".html", ".htm"];
 
@@ -16,6 +17,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
     (state) => state.snapshot?.settings.extensions ?? DEFAULT_EXTENSIONS,
   );
   const [busy, setBusy] = useState(false);
+  const [bindPath, setBindPath] = useState<string | null>(null);
 
   async function handleImport() {
     const selected = await open({
@@ -39,6 +41,31 @@ export function Toolbar({ onToast }: ToolbarProps) {
     }
   }
 
+  async function handleBind() {
+    const selected = await open({
+      directory: true,
+      title: "绑定文件夹",
+    });
+    if (typeof selected !== "string") {
+      return;
+    }
+    setBindPath(selected);
+  }
+
+  async function handleScanAll() {
+    setBusy(true);
+    try {
+      const summary = await scanAll();
+      onToast(
+        `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
+      );
+    } catch (err) {
+      onToast(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <header
       style={{
@@ -52,6 +79,23 @@ export function Toolbar({ onToast }: ToolbarProps) {
       <button type="button" disabled={busy} onClick={() => void handleImport()}>
         导入文件
       </button>
+      <button type="button" disabled={busy} onClick={() => void handleBind()}>
+        绑定文件夹
+      </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void handleScanAll()}
+      >
+        扫描新文件
+      </button>
+      {bindPath ? (
+        <BindDialog
+          path={bindPath}
+          onClose={() => setBindPath(null)}
+          onToast={onToast}
+        />
+      ) : null}
     </header>
   );
 }
@@ -78,5 +122,5 @@ function errorMessage(err: unknown): string {
       return message;
     }
   }
-  return "导入失败";
+  return "操作失败";
 }

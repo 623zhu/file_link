@@ -42,7 +42,7 @@ function App() {
 
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar onToast={showToast} />
       <div className="main">
         <Toolbar onToast={showToast} />
         <LinkList onToast={showToast} />
