@@ -28,7 +28,10 @@ pub fn run() {
             service::bootstrap(app)?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::get_snapshot])
+        .invoke_handler(tauri::generate_handler![
+            commands::get_snapshot,
+            commands::import_files,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
