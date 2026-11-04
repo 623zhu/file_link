@@ -17,7 +17,11 @@ export function LinkList({ onToast }: LinkListProps) {
   const bindings =
     useStore((state) => state.snapshot?.bindings) ?? EMPTY_BINDINGS;
   const view = useStore((state) => state.view);
-  const visible = useMemo(() => filterLinks(links, view), [links, view]);
+  const query = useStore((state) => state.query);
+  const visible = useMemo(
+    () => filterLinks(links, view, query),
+    [links, view, query],
+  );
 
   return (
     <section className="link-list" aria-label="链接列表">

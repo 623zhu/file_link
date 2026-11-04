@@ -16,6 +16,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
   const extensions = useStore(
     (state) => state.snapshot?.settings.extensions ?? DEFAULT_EXTENSIONS,
   );
+  const query = useStore((state) => state.query);
   const [busy, setBusy] = useState(false);
   const [bindPath, setBindPath] = useState<string | null>(null);
 
@@ -76,6 +77,21 @@ export function Toolbar({ onToast }: ToolbarProps) {
         borderBottom: "1px solid #e5e7eb",
       }}
     >
+      <input
+        type="search"
+        value={query}
+        placeholder="搜索文件名或路径……"
+        aria-label="搜索文件名或路径"
+        onChange={(event) => useStore.setState({ query: event.target.value })}
+        style={{
+          flex: 1,
+          minWidth: 160,
+          height: 28,
+          padding: "0 8px",
+          border: "1px solid #e5e7eb",
+          borderRadius: 4,
+        }}
+      />
       <button type="button" disabled={busy} onClick={() => void handleImport()}>
         导入文件
       </button>
