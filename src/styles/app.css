@@ -160,8 +160,20 @@ button {
   background: #f8fafc;
 }
 
+.link-row.selected {
+  background: #dbeafe;
+}
+
+.link-row.selected:hover {
+  background: #bfdbfe;
+}
+
 .link-row.missing {
   color: #9ca3af;
+}
+
+.link-list:focus {
+  outline: none;
 }
 
 .link-cell {

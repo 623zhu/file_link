@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 
-import { openLink, removeLinks, revealLink } from "../api/commands";
+import { openLink, revealLink } from "../api/commands";
 import type { AppError, Binding, Link, Source } from "../types";
-import { ConfirmDialog } from "./ConfirmDialog";
 
 interface LinkRowProps {
   link: Link;
   bindings: Binding[];
+  selected: boolean;
+  onSelect: (event: {
+    shiftKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+  }) => void;
+  onEnsureSelected: () => void;
+  onRequestRemove: () => void;
   onToast: (message: string) => void;
 }
 
@@ -15,9 +22,16 @@ interface MenuPosition {
   y: number;
 }
 
-export function LinkRow({ link, bindings, onToast }: LinkRowProps) {
+export function LinkRow({
+  link,
+  bindings,
+  selected,
+  onSelect,
+  onEnsureSelected,
+  onRequestRemove,
+  onToast,
+}: LinkRowProps) {
   const [menu, setMenu] = useState<MenuPosition | null>(null);
-  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!menu) {
@@ -62,24 +76,34 @@ export function LinkRow({ link, bindings, onToast }: LinkRowProps) {
     }
   }
 
-  async function handleRemove() {
-    setConfirming(false);
-    try {
-      await removeLinks([link.id]);
-    } catch (err) {
-      onToast(errorMessage(err));
-    }
-  }
-
   const source = sourceLabel(link.sources, bindings);
+  const className = [
+    "link-row",
+    link.missing ? "missing" : "",
+    selected ? "selected" : "",
+  ]
+    .filter((part) => part.length > 0)
+    .join(" ");
 
   return (
     <div
-      className={link.missing ? "link-row missing" : "link-row"}
+      className={className}
+      data-link-id={link.id}
+      aria-selected={selected}
+      onClick={(event) => {
+        if (event.detail > 1) {
+          return;
+        }
+        if ((event.target as HTMLElement).closest(".context-menu")) {
+          return;
+        }
+        onSelect(event);
+      }}
       onDoubleClick={() => void handleOpen()}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
+        onEnsureSelected();
         setMenu({
           x: Math.min(event.clientX, window.innerWidth - 200),
           y: Math.min(event.clientY, window.innerHeight - 180),
@@ -131,19 +155,13 @@ export function LinkRow({ link, bindings, onToast }: LinkRowProps) {
             role="menuitem"
             onClick={() => {
               setMenu(null);
-              setConfirming(true);
+              onRequestRemove();
             }}
           >
             移除链接
           </button>
         </div>
       ) : null}
-      <ConfirmDialog
-        open={confirming}
-        message="从 File Link 中移除选中的 1 个链接？只删除链接，不会删除磁盘上的原文件。"
-        onConfirm={() => void handleRemove()}
-        onCancel={() => setConfirming(false)}
-      />
     </div>
   );
 }
