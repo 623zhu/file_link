@@ -103,7 +103,13 @@ pub fn start_catch_up<R: Runtime>(app: AppHandle<R>) {
         .spawn(move || {
             let state = app.state::<AppState>();
             match catch_up(&state) {
-                Ok(_) => {
+                Ok(summary) => {
+                    log::info!(
+                        "startup catch-up finished: added={}, restored={}, missing={}",
+                        summary.added,
+                        summary.restored,
+                        summary.missing
+                    );
                     emit_unavailable_bindings(&state, &app);
                     if let Err(err) = app.emit("state-changed", ()) {
                         log::warn!("failed to emit state-changed after catch-up: {err}");
@@ -439,6 +445,14 @@ fn reconcile_scanned(
             if had_unstable {
                 state.watcher.schedule_reconcile(id, Duration::from_secs(2));
             }
+            log::info!(
+                "reconciled binding {} at {}: added={}, restored={}, missing={}",
+                id,
+                binding.path,
+                summary.added,
+                summary.restored,
+                summary.missing
+            );
             Ok(summary)
         }
         Err(err) => {
@@ -530,7 +544,10 @@ fn new_binding(display: String, key: String, recursive: bool, auto_watch: bool) 
 
 fn scan_files(binding: &Binding, settings: &Settings) -> Result<Vec<(String, String)>, AppError> {
     let rule = rule::effective_rule(binding, settings);
-    scanner::scan(&binding.path, binding.recursive, &rule).map_err(|_| AppError::BindingUnavailable)
+    scanner::scan(&binding.path, binding.recursive, &rule).map_err(|err| {
+        log::error!("scan failed for {}: {err}", binding.path);
+        AppError::BindingUnavailable
+    })
 }
 
 fn sync_all_watchers(state: &AppState) {

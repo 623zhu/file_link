@@ -153,9 +153,11 @@ pub(crate) fn spawn_worker(rx: Receiver<String>, on_binding: impl Fn(String) + S
 
 fn handle_watch_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
     let state = app.state::<AppState>();
+    log::info!("folder change detected for binding {id}");
     match service::reconcile_binding(&state, id) {
         Ok(summary) => {
             if summary.added > 0 {
+                log::info!("auto-imported {} file(s) for binding {id}", summary.added);
                 let payload = AutoImportedPayload {
                     binding_id: id.to_string(),
                     added: summary.added,

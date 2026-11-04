@@ -18,11 +18,14 @@ pub fn scan(
     if !meta.is_dir() {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "路径不是目录"));
     }
-    if recursive {
-        scan_recursive(path, rule)
+    log::info!("scanning {} (recursive={recursive})", path.display());
+    let results = if recursive {
+        scan_recursive(path, rule)?
     } else {
-        scan_one_level(path, rule)
-    }
+        scan_one_level(path, rule)?
+    };
+    log::info!("scan found {} file(s) in {}", results.len(), path.display());
+    Ok(results)
 }
 
 fn scan_one_level(path: &Path, rule: &Rule) -> io::Result<Vec<(String, String)>> {

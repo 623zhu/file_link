@@ -34,7 +34,7 @@
 | `uuid` | link / binding ID |
 | `chrono` | 时间戳 |
 | `thiserror` | 错误类型 |
-| `log` + `tauri-plugin-log` | 日志 |
+| `log` + `tauri-plugin-log` | 日志；级别 `info`，release 写入应用日志目录 |
 | `tempfile`（dev） | 单元测试临时目录 |
 
 ### 1.2 前端依赖

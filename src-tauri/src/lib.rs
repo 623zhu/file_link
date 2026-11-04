@@ -14,10 +14,12 @@ pub use error::AppError;
 pub use service::{AppState, Snapshot, write, write_and_emit};
 
 use tauri::Manager;
+use tauri_plugin_log::{Target, TargetKind, TimezoneStrategy};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(log_plugin())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
@@ -49,4 +51,19 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn log_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
+    let mut targets = vec![Target::new(TargetKind::LogDir {
+        file_name: Some("file-link".into()),
+    })];
+    if cfg!(debug_assertions) {
+        targets.push(Target::new(TargetKind::Stdout));
+    }
+
+    tauri_plugin_log::Builder::new()
+        .level(log::LevelFilter::Info)
+        .timezone_strategy(TimezoneStrategy::UseLocal)
+        .targets(targets)
+        .build()
 }
