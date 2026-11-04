@@ -1,3 +1,4 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   useEffect,
   useMemo,
@@ -20,6 +21,7 @@ import { LinkRow } from "./LinkRow";
 
 const EMPTY_LINKS: Link[] = [];
 const EMPTY_BINDINGS: Binding[] = [];
+const ROW_HEIGHT = 36;
 
 interface LinkListProps {
   onToast: (message: string) => void;
@@ -39,7 +41,20 @@ export function LinkList({ onToast }: LinkListProps) {
   const visibleIds = useMemo(() => visible.map((link) => link.id), [visible]);
   const anchorIdRef = useRef<string | null>(null);
   const listRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const [confirming, setConfirming] = useState(false);
+  // eslint-disable-next-line react-hooks/incompatible-library -- @tanstack/react-virtual
+  const virtualizer = useVirtualizer({
+    count: visible.length,
+    getScrollElement: () => bodyRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 12,
+    getItemKey: (index) => visible[index]?.id ?? index,
+  });
+
+  useEffect(() => {
+    bodyRef.current?.scrollTo(0, 0);
+  }, [query, view]);
 
   useEffect(() => {
     const visibleSet = new Set(visibleIds);
@@ -150,22 +165,51 @@ export function LinkList({ onToast }: LinkListProps) {
         <div>来源</div>
         <div>加入时间</div>
       </div>
-      <div className="link-body">
+      <div
+        className="link-body"
+        ref={bodyRef}
+        style={{ overflowAnchor: "none" }}
+      >
         {visible.length === 0 ? (
           <div className="link-empty">暂无链接</div>
         ) : (
-          visible.map((link) => (
-            <LinkRow
-              key={link.id}
-              link={link}
-              bindings={bindings}
-              selected={selectedIds.has(link.id)}
-              onSelect={(event) => handleSelect(link.id, event)}
-              onEnsureSelected={() => handleEnsureSelected(link.id)}
-              onRequestRemove={() => setConfirming(true)}
-              onToast={onToast}
-            />
-          ))
+          <div
+            style={{
+              height: virtualizer.getTotalSize(),
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {virtualizer.getVirtualItems().map((virtualRow) => {
+              const link = visible[virtualRow.index];
+              if (!link) {
+                return null;
+              }
+              return (
+                <div
+                  key={virtualRow.key}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: virtualRow.size,
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                >
+                  <LinkRow
+                    link={link}
+                    bindings={bindings}
+                    selected={selectedIds.has(link.id)}
+                    onSelect={(event) => handleSelect(link.id, event)}
+                    onEnsureSelected={() => handleEnsureSelected(link.id)}
+                    onRequestRemove={() => setConfirming(true)}
+                    onToast={onToast}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
       <ConfirmDialog
