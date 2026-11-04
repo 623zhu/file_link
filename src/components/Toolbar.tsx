@@ -5,6 +5,7 @@ import { importFiles, scanAll } from "../api/commands";
 import { useStore } from "../store";
 import type { AppError } from "../types";
 import { BindDialog } from "./BindDialog";
+import { SettingsDialog } from "./SettingsDialog";
 
 const DEFAULT_EXTENSIONS = [".html", ".htm"];
 
@@ -19,6 +20,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
   const query = useStore((state) => state.query);
   const [busy, setBusy] = useState(false);
   const [bindPath, setBindPath] = useState<string | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   async function handleImport() {
     const selected = await open({
@@ -105,10 +107,25 @@ export function Toolbar({ onToast }: ToolbarProps) {
       >
         扫描新文件
       </button>
+      <button
+        type="button"
+        disabled={busy}
+        title="设置"
+        aria-label="设置"
+        onClick={() => setSettingsOpen(true)}
+      >
+        ⚙
+      </button>
       {bindPath ? (
         <BindDialog
           path={bindPath}
           onClose={() => setBindPath(null)}
+          onToast={onToast}
+        />
+      ) : null}
+      {settingsOpen ? (
+        <SettingsDialog
+          onClose={() => setSettingsOpen(false)}
           onToast={onToast}
         />
       ) : null}

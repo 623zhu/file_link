@@ -4,7 +4,7 @@ use std::path::Path;
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::core::model::Binding;
+use crate::core::model::{Binding, Settings};
 use crate::core::reconcile::ReconcileSummary;
 use crate::error::AppError;
 use crate::service::{
@@ -141,6 +141,17 @@ pub fn scan_all(app: AppHandle, state: State<AppState>) -> Result<ReconcileSumma
     service::emit_unavailable_bindings(&state, &app);
     emit_state_changed(&app)?;
     Ok(result)
+}
+
+#[tauri::command]
+pub fn update_settings(
+    app: AppHandle,
+    state: State<AppState>,
+    extensions: Vec<String>,
+) -> Result<Settings, AppError> {
+    service::write_and_emit(&state, &app, |data| {
+        service::update_settings(data, &extensions)
+    })
 }
 
 fn emit_state_changed(app: &AppHandle) -> Result<(), AppError> {

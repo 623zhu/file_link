@@ -382,7 +382,7 @@ for link in 含该绑定来源的 links:
 | `remove_links` | `ids: string[]` | `{ removed }` | 只删 link，按 5.3 写忽略名单 |
 | `open_link` | `id` | — | 见 6.6 |
 | `reveal_link` | `id` | — | 见 6.6 |
-| `update_settings` | `extensions: string[]` | `Settings` | 校验并规范化为小写带点格式 |
+| `update_settings` | `extensions: string[]` | `Settings` | 去空格、转小写、补前导点、去重；规范化后为空则报错 |
 
 ### 7.2 Events（后端 → 前端）
 
@@ -408,6 +408,8 @@ pub enum AppError {
     OpenFailed(String),
     #[error("找不到对应的记录")]
     NotFound,
+    #[error("至少需要一个文件类型")]
+    EmptyExtensions,
     #[error("保存数据失败：{0}")]
     Io(#[from] std::io::Error),
 }

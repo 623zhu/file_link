@@ -228,6 +228,29 @@ pub fn mark_missing(data: &mut Data, id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+pub fn update_settings(data: &mut Data, extensions: &[String]) -> Result<Settings, AppError> {
+    let mut normalized = Vec::new();
+    let mut seen = HashSet::new();
+    for raw in extensions {
+        let trimmed = raw.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let mut ext = trimmed.to_lowercase();
+        if !ext.starts_with('.') {
+            ext.insert(0, '.');
+        }
+        if seen.insert(ext.clone()) {
+            normalized.push(ext);
+        }
+    }
+    if normalized.is_empty() {
+        return Err(AppError::EmptyExtensions);
+    }
+    data.settings.extensions = normalized;
+    Ok(data.settings.clone())
+}
+
 pub fn remove_links(data: &mut Data, ids: &[String]) -> RemoveLinksResult {
     let mut ignores = Vec::new();
     let before = data.links.len();
@@ -702,6 +725,30 @@ mod tests {
             snapshot(&state).unwrap().settings.extensions,
             loaded.data.settings.extensions
         );
+    }
+
+    #[test]
+    fn update_settings_normalizes_extensions() {
+        let mut data = Data::default();
+        let settings = update_settings(
+            &mut data,
+            &["HTML".to_string(), " .htm ".to_string(), "md".to_string()],
+        )
+        .unwrap();
+        assert_eq!(settings.extensions, [".html", ".htm", ".md"]);
+        assert_eq!(data.settings.extensions, [".html", ".htm", ".md"]);
+    }
+
+    #[test]
+    fn update_settings_rejects_empty_list() {
+        let mut data = Data::default();
+        let err = update_settings(&mut data, &[]).unwrap_err();
+        assert!(matches!(err, AppError::EmptyExtensions));
+        assert_eq!(data.settings.extensions, [".html", ".htm"]);
+
+        let err = update_settings(&mut data, &["  ".to_string(), "".to_string()]).unwrap_err();
+        assert!(matches!(err, AppError::EmptyExtensions));
+        assert_eq!(data.settings.extensions, [".html", ".htm"]);
     }
 
     #[test]

@@ -13,6 +13,8 @@ pub enum AppError {
     OpenFailed(String),
     #[error("找不到对应的记录")]
     NotFound,
+    #[error("至少需要一个文件类型")]
+    EmptyExtensions,
     #[error("保存数据失败：{0}")]
     Io(#[from] std::io::Error),
 }
@@ -25,6 +27,7 @@ impl AppError {
             Self::BindingUnavailable => "BindingUnavailable",
             Self::OpenFailed(_) => "OpenFailed",
             Self::NotFound => "NotFound",
+            Self::EmptyExtensions => "EmptyExtensions",
             Self::Io(_) => "Io",
         }
     }

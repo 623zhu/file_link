@@ -45,6 +45,7 @@ pub fn run() {
             commands::remove_binding,
             commands::scan_binding,
             commands::scan_all,
+            commands::update_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
