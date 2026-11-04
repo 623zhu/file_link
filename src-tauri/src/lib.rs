@@ -6,6 +6,7 @@ mod watcher;
 
 pub use core::model::{Binding, Data, Ignore, Link, Settings, Source};
 pub use core::path::normalize;
+pub use core::store::{LoadResult, load, save};
 pub use error::AppError;
 
 use tauri::Manager;
