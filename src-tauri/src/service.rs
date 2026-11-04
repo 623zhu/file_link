@@ -1,6 +1,8 @@
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
+use std::time::{Duration, SystemTime};
 
 use chrono::Local;
 use serde::Serialize;
@@ -334,26 +336,49 @@ pub fn remove_binding(state: &AppState, id: &str) -> Result<RemoveBindingResult,
 }
 
 pub fn scan_binding(state: &AppState, id: &str) -> Result<ReconcileSummary, AppError> {
-    reconcile_binding(state, id)
+    reconcile_scanned(state, id, false)
 }
 
 pub fn reconcile_binding(state: &AppState, id: &str) -> Result<ReconcileSummary, AppError> {
+    reconcile_scanned(state, id, true)
+}
+
+fn reconcile_scanned(
+    state: &AppState,
+    id: &str,
+    check_stable: bool,
+) -> Result<ReconcileSummary, AppError> {
     let (binding, settings) = {
         let data = lock(&state.data)?;
         (find_binding(&data, id)?.clone(), data.settings.clone())
     };
     match scan_files(&binding, &settings) {
-        Ok(files) => write(state, |data| {
-            {
-                let current = data
-                    .bindings
-                    .iter_mut()
-                    .find(|binding| binding.id == id)
-                    .ok_or(AppError::NotFound)?;
-                current.unavailable = false;
+        Ok(files) => {
+            let (files, had_unstable) = if check_stable {
+                let new_keys = {
+                    let data = lock(&state.data)?;
+                    new_file_keys(&data, id, &files)
+                };
+                drop_unstable_new_files(files, &new_keys)
+            } else {
+                (files, false)
+            };
+            let summary = write(state, |data| {
+                {
+                    let current = data
+                        .bindings
+                        .iter_mut()
+                        .find(|binding| binding.id == id)
+                        .ok_or(AppError::NotFound)?;
+                    current.unavailable = false;
+                }
+                Ok(reconcile::reconcile(data, id, &files, file_exists))
+            })?;
+            if had_unstable {
+                state.watcher.schedule_reconcile(id, Duration::from_secs(2));
             }
-            Ok(reconcile::reconcile(data, id, &files, file_exists))
-        }),
+            Ok(summary)
+        }
         Err(err) => {
             let _ = write(state, |data| {
                 if let Some(current) = data.bindings.iter_mut().find(|binding| binding.id == id) {
@@ -455,6 +480,71 @@ fn sync_watcher(state: &AppState, binding: &Binding) {
 
 fn file_exists(path: &str) -> bool {
     Path::new(path).is_file()
+}
+
+const STABILITY_INTERVAL: Duration = Duration::from_millis(500);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FileStamp {
+    len: u64,
+    modified: SystemTime,
+}
+
+fn file_stamp(path: &str) -> Option<FileStamp> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some(FileStamp {
+        len: meta.len(),
+        modified: meta.modified().ok()?,
+    })
+}
+
+fn new_file_keys(data: &Data, binding_id: &str, files: &[(String, String)]) -> HashSet<String> {
+    files
+        .iter()
+        .filter_map(|(_, key)| {
+            if data
+                .ignored
+                .iter()
+                .any(|ignore| ignore.binding_id == binding_id && ignore.key == *key)
+            {
+                return None;
+            }
+            if data.links.iter().any(|link| link.key == *key) {
+                return None;
+            }
+            Some(key.clone())
+        })
+        .collect()
+}
+
+fn drop_unstable_new_files(
+    mut files: Vec<(String, String)>,
+    new_keys: &HashSet<String>,
+) -> (Vec<(String, String)>, bool) {
+    if new_keys.is_empty() {
+        return (files, false);
+    }
+    let first: HashMap<String, Option<FileStamp>> = files
+        .iter()
+        .filter(|(_, key)| new_keys.contains(key))
+        .map(|(path, _)| (path.clone(), file_stamp(path)))
+        .collect();
+    std::thread::sleep(STABILITY_INTERVAL);
+    let mut had_unstable = false;
+    files.retain(|(path, key)| {
+        if !new_keys.contains(key) {
+            return true;
+        }
+        let second = file_stamp(path);
+        let stable =
+            first.get(path).and_then(Option::as_ref) == second.as_ref() && second.is_some();
+        if !stable {
+            had_unstable = true;
+            log::info!("skipping unstable new file {path}");
+        }
+        stable
+    });
+    (files, had_unstable)
 }
 
 pub fn emit_recovery_if_needed<R: Runtime, E: Emitter<R>>(
@@ -803,6 +893,85 @@ mod tests {
             snap.links
                 .iter()
                 .any(|link| link.name == "ok.html" && !link.missing)
+        );
+    }
+
+    fn scanned(path: &Path) -> (String, String) {
+        let display = path.to_string_lossy().into_owned();
+        let key = crate::core::path::normalize(&display).unwrap().1;
+        (display, key)
+    }
+
+    #[test]
+    fn unchanged_new_file_is_stable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.html");
+        fs::write(&path, "<html></html>").unwrap();
+        let (display, key) = scanned(&path);
+        let new_keys = HashSet::from([key.clone()]);
+
+        let (kept, unstable) =
+            drop_unstable_new_files(vec![(display.clone(), key.clone())], &new_keys);
+
+        assert!(!unstable);
+        assert_eq!(kept, [(display, key)]);
+    }
+
+    #[test]
+    fn changing_new_file_is_unstable() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("a.html");
+        fs::write(&path, "a").unwrap();
+        let (display, key) = scanned(&path);
+        let new_keys = HashSet::from([key.clone()]);
+        let writer = {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(200));
+                fs::write(&path, "abcdef").unwrap();
+            })
+        };
+
+        let (kept, unstable) = drop_unstable_new_files(vec![(display, key)], &new_keys);
+        writer.join().unwrap();
+
+        assert!(unstable);
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn manual_scan_imports_file_without_stability_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let (_data_dir, state) = temp_state(Data::default());
+        let added = add_binding(&state, &dir.path().to_string_lossy(), false, false).unwrap();
+        let path = dir.path().join("growing.html");
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let writer = {
+            let path = path.clone();
+            let stop = std::sync::Arc::clone(&stop);
+            std::thread::spawn(move || {
+                use std::io::Write;
+                let mut file = fs::File::create(&path).unwrap();
+                while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    file.write_all(b"x").unwrap();
+                    file.flush().unwrap();
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            })
+        };
+        std::thread::sleep(Duration::from_millis(50));
+
+        scan_binding(&state, &added.binding.id).unwrap();
+        stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        writer.join().unwrap();
+
+        assert!(
+            snapshot(&state)
+                .unwrap()
+                .links
+                .iter()
+                .any(|link| link.name == "growing.html"),
+            "manual scan should import a file even while it is still being written"
         );
     }
 }

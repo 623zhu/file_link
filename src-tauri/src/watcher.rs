@@ -96,6 +96,25 @@ impl WatcherManager {
         self.start(binding)
     }
 
+    pub(crate) fn schedule_reconcile(&self, binding_id: &str, delay: Duration) {
+        let tx = self.tx.clone();
+        let id = binding_id.to_string();
+        if let Err(err) = std::thread::Builder::new()
+            .name("folder-watcher-retry".into())
+            .spawn({
+                let id = id.clone();
+                move || {
+                    std::thread::sleep(delay);
+                    if tx.send(id).is_err() {
+                        log::warn!("scheduled reconcile dropped; worker stopped");
+                    }
+                }
+            })
+        {
+            log::error!("failed to schedule folder reconcile for {id}: {err}");
+        }
+    }
+
     #[cfg(test)]
     pub fn is_watching(&self, binding_id: &str) -> bool {
         lock(&self.watchers)
@@ -362,5 +381,91 @@ mod tests {
         write_html(files.path(), "after-unbind.html");
         thread::sleep(Duration::from_secs(4));
         assert!(snapshot(&state).unwrap().links.is_empty());
+    }
+
+    fn has_link(state: &AppState, name: &str) -> bool {
+        snapshot(state)
+            .unwrap()
+            .links
+            .iter()
+            .any(|link| link.name == name)
+    }
+
+    #[test]
+    #[ignore]
+    fn growing_html_is_imported_only_after_write_finishes() {
+        use std::io::Write;
+
+        let (files, _data_dir, state) = temp_state();
+        write_html(files.path(), "existing.html");
+        let state = Arc::new(state);
+        start_test_worker(&state);
+        add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        thread::sleep(Duration::from_millis(200));
+
+        let growing = files.path().join("growing.html");
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let writer = {
+            let growing = growing.clone();
+            let stop = Arc::clone(&stop);
+            thread::spawn(move || {
+                let mut file = fs::File::create(&growing).unwrap();
+                file.write_all(b"<html>\n").unwrap();
+                while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                    writeln!(file, "<p>{}</p>", file.metadata().unwrap().len()).unwrap();
+                    file.flush().unwrap();
+                    thread::sleep(Duration::from_millis(50));
+                }
+                file.write_all(b"</html>\n").unwrap();
+                file.flush().unwrap();
+            })
+        };
+
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            assert!(
+                !has_link(&state, "growing.html"),
+                "in-progress write should not create a link"
+            );
+            thread::sleep(Duration::from_millis(100));
+        }
+        stop.store(true, std::sync::atomic::Ordering::SeqCst);
+        writer.join().unwrap();
+
+        assert!(
+            wait_for_link(&state, "growing.html", Duration::from_secs(10)),
+            "growing.html should be imported after the write finishes"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn chrome_download_temp_file_is_not_imported() {
+        let (files, _data_dir, state) = temp_state();
+        let state = Arc::new(state);
+        start_test_worker(&state);
+        add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        thread::sleep(Duration::from_millis(200));
+
+        let temp = files.path().join("page.html.crdownload");
+        fs::write(&temp, "<html>partial").unwrap();
+        thread::sleep(Duration::from_secs(4));
+        assert!(
+            snapshot(&state).unwrap().links.is_empty(),
+            ".crdownload should not become a link"
+        );
+
+        fs::rename(&temp, files.path().join("page.html")).unwrap();
+        assert!(
+            wait_for_link(&state, "page.html", Duration::from_secs(8)),
+            "final HTML should be imported after the download finishes"
+        );
+        assert!(
+            snapshot(&state)
+                .unwrap()
+                .links
+                .iter()
+                .all(|link| !link.name.contains("crdownload"))
+        );
     }
 }
