@@ -45,7 +45,7 @@ function App() {
       <Sidebar />
       <div className="main">
         <Toolbar onToast={showToast} />
-        <LinkList />
+        <LinkList onToast={showToast} />
       </div>
       <Toast message={toast} onDismiss={dismissToast} />
     </div>

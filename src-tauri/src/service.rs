@@ -7,7 +7,7 @@ use serde::Serialize;
 use tauri::{App, Emitter, Manager, Runtime};
 use uuid::Uuid;
 
-use crate::core::model::{Binding, Data, Link, Settings, Source};
+use crate::core::model::{Binding, Data, Ignore, Link, Settings, Source};
 use crate::core::path;
 use crate::core::store;
 use crate::error::AppError;
@@ -31,6 +31,12 @@ pub struct Snapshot {
 pub struct ImportResult {
     pub added: usize,
     pub skipped: usize,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveLinksResult {
+    pub removed: usize,
 }
 
 #[derive(Clone, Serialize)]
@@ -142,6 +148,56 @@ fn import_one(data: &mut Data, raw: &str) -> ImportOutcome {
         missing: false,
     });
     ImportOutcome::Added
+}
+
+pub fn link_path(state: &AppState, id: &str) -> Result<String, AppError> {
+    let data = lock(&state.data)?;
+    data.links
+        .iter()
+        .find(|link| link.id == id)
+        .map(|link| link.path.clone())
+        .ok_or(AppError::NotFound)
+}
+
+pub fn mark_missing(data: &mut Data, id: &str) -> Result<(), AppError> {
+    let link = data
+        .links
+        .iter_mut()
+        .find(|link| link.id == id)
+        .ok_or(AppError::NotFound)?;
+    link.missing = true;
+    Ok(())
+}
+
+pub fn remove_links(data: &mut Data, ids: &[String]) -> RemoveLinksResult {
+    let mut ignores = Vec::new();
+    let before = data.links.len();
+    data.links.retain(|link| {
+        if !ids.iter().any(|id| id == &link.id) {
+            return true;
+        }
+        for source in &link.sources {
+            if let Source::Binding { binding_id } = source {
+                ignores.push(Ignore {
+                    binding_id: binding_id.clone(),
+                    key: link.key.clone(),
+                });
+            }
+        }
+        false
+    });
+    for ignore in ignores {
+        if !data
+            .ignored
+            .iter()
+            .any(|existing| existing.binding_id == ignore.binding_id && existing.key == ignore.key)
+        {
+            data.ignored.push(ignore);
+        }
+    }
+    RemoveLinksResult {
+        removed: before - data.links.len(),
+    }
 }
 
 pub fn emit_recovery_if_needed<R: Runtime, E: Emitter<R>>(
@@ -350,6 +406,70 @@ mod tests {
                 .links
                 .iter()
                 .all(|link| link.sources == [Source::Manual])
+        );
+    }
+
+    fn sample_link(id: &str, key: &str, sources: Vec<Source>) -> Link {
+        Link {
+            id: id.to_string(),
+            path: format!("D:\\files\\{id}.html"),
+            key: key.to_string(),
+            name: format!("{id}.html"),
+            sources,
+            added_at: Local::now(),
+            missing: false,
+        }
+    }
+
+    #[test]
+    fn remove_links_does_not_ignore_manual_links() {
+        let mut data = Data::default();
+        data.links.push(sample_link(
+            "manual",
+            "d:\\files\\manual.html",
+            vec![Source::Manual],
+        ));
+
+        let result = remove_links(&mut data, &["manual".to_string()]);
+
+        assert_eq!(result, RemoveLinksResult { removed: 1 });
+        assert!(data.links.is_empty());
+        assert!(data.ignored.is_empty());
+    }
+
+    #[test]
+    fn remove_links_writes_ignore_for_each_binding_source() {
+        let mut data = Data::default();
+        data.links.push(sample_link(
+            "bound",
+            "d:\\files\\bound.html",
+            vec![
+                Source::Manual,
+                Source::Binding {
+                    binding_id: "b1".to_string(),
+                },
+                Source::Binding {
+                    binding_id: "b2".to_string(),
+                },
+            ],
+        ));
+
+        let result = remove_links(&mut data, &["bound".to_string()]);
+
+        assert_eq!(result, RemoveLinksResult { removed: 1 });
+        assert!(data.links.is_empty());
+        assert_eq!(
+            data.ignored,
+            [
+                Ignore {
+                    binding_id: "b1".to_string(),
+                    key: "d:\\files\\bound.html".to_string(),
+                },
+                Ignore {
+                    binding_id: "b2".to_string(),
+                    key: "d:\\files\\bound.html".to_string(),
+                },
+            ]
         );
     }
 }

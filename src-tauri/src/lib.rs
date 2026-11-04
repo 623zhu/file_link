@@ -31,6 +31,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
             commands::import_files,
+            commands::open_link,
+            commands::reveal_link,
+            commands::remove_links,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -122,6 +122,12 @@ button {
 .link-row {
   height: 36px;
   border-bottom: 1px solid #f3f4f6;
+  cursor: default;
+  user-select: none;
+}
+
+.link-row:hover {
+  background: #f8fafc;
 }
 
 .link-row.missing {
@@ -160,4 +166,69 @@ button {
   padding: 32px 16px;
   color: #6b7280;
   text-align: center;
+}
+
+.context-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 180px;
+  padding: 4px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.context-menu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu button:hover {
+  background: #eef2f7;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.35);
+}
+
+.dialog {
+  width: min(420px, calc(100% - 32px));
+  padding: 20px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+}
+
+.dialog-message {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dialog-confirm {
+  color: #fff;
+  background: #2563eb;
+  border: 0;
+  border-radius: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
 }

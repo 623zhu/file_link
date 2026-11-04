@@ -8,7 +8,11 @@ import { LinkRow } from "./LinkRow";
 const EMPTY_LINKS: Link[] = [];
 const EMPTY_BINDINGS: Binding[] = [];
 
-export function LinkList() {
+interface LinkListProps {
+  onToast: (message: string) => void;
+}
+
+export function LinkList({ onToast }: LinkListProps) {
   const links = useStore((state) => state.snapshot?.links) ?? EMPTY_LINKS;
   const bindings =
     useStore((state) => state.snapshot?.bindings) ?? EMPTY_BINDINGS;
@@ -28,7 +32,12 @@ export function LinkList() {
           <div className="link-empty">暂无链接</div>
         ) : (
           visible.map((link) => (
-            <LinkRow key={link.id} link={link} bindings={bindings} />
+            <LinkRow
+              key={link.id}
+              link={link}
+              bindings={bindings}
+              onToast={onToast}
+            />
           ))
         )}
       </div>
