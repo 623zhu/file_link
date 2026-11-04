@@ -4,6 +4,9 @@ mod error;
 mod service;
 mod watcher;
 
+pub use core::model::{Binding, Data, Ignore, Link, Settings, Source};
+pub use error::AppError;
+
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
