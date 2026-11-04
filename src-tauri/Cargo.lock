@@ -967,6 +967,7 @@ name = "file-link"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dunce",
  "serde",
  "serde_json",
  "tauri",
@@ -974,6 +975,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
+ "tempfile",
  "thiserror 2.0.21",
 ]
 
