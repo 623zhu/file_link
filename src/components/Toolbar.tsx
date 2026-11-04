@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { importFiles, scanAll } from "../api/commands";
 import { useStore } from "../store";
-import type { AppError } from "../types";
+import { errorMessage } from "../utils/error";
 import { BindDialog } from "./BindDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
@@ -38,7 +38,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
       const result = await importFiles(paths);
       onToast(`已导入 ${result.added} 个，跳过 ${result.skipped} 个已存在`);
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "导入失败，请确认文件仍可访问后重试"));
     } finally {
       setBusy(false);
     }
@@ -63,7 +63,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
         `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
       );
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "扫描失败，请确认绑定的文件夹仍可访问后重试"));
     } finally {
       setBusy(false);
     }
@@ -146,14 +146,4 @@ function dialogFilters(extensions: string[]) {
   }
   filters.push({ name: "所有文件", extensions: ["*"] });
   return filters;
-}
-
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return "操作失败";
 }

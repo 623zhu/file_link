@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { openLink, revealLink } from "../api/commands";
-import type { AppError, Binding, Link, Source } from "../types";
+import type { Binding, Link, Source } from "../types";
+import { errorMessage } from "../utils/error";
 
 interface LinkRowProps {
   link: Link;
@@ -53,7 +54,12 @@ export function LinkRow({
     try {
       await openLink(link.id);
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(
+        errorMessage(
+          err,
+          "打开失败，请确认文件仍在原位置，或从列表中移除该链接",
+        ),
+      );
     }
   }
 
@@ -62,7 +68,9 @@ export function LinkRow({
     try {
       await revealLink(link.id);
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(
+        errorMessage(err, "无法在资源管理器中显示该文件，请确认文件仍在原位置"),
+      );
     }
   }
 
@@ -72,7 +80,7 @@ export function LinkRow({
       await copyText(link.path);
       onToast("已复制路径");
     } catch {
-      onToast("复制路径失败");
+      onToast("复制路径失败，请重试或手动选择路径复制");
     }
   }
 
@@ -199,16 +207,6 @@ function formatAddedAt(value: string): string {
   return `${month}-${day} ${hours}:${minutes}`;
 }
 
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return "操作失败";
-}
-
 async function copyText(value: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value);
@@ -224,6 +222,6 @@ async function copyText(value: string): Promise<void> {
   const copied = document.execCommand("copy");
   textarea.remove();
   if (!copied) {
-    throw new Error("copy failed");
+    throw new Error("复制失败");
   }
 }

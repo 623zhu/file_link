@@ -391,31 +391,31 @@ for link in 含该绑定来源的 links:
 | `state-changed` | — | 重新调用 `get_snapshot` |
 | `auto-imported` | `{ bindingId, added }` | Toast：「已从 xxx 自动导入 N 个文件」 |
 | `binding-unavailable` | `{ bindingId }` | 侧边栏该绑定显示「目录不可用」 |
-| `data-recovered` | `{ backupPath }` | 提示数据文件损坏，已备份并以空数据启动 |
+| `data-recovered` | `{ backupPath }` | 提示：「数据文件已损坏，已备份到 {backupPath}，当前以空数据启动。」 |
 
 ### 7.3 错误
 
 ```rust
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("文件不存在或已被移动")]
+    #[error("文件不存在或已被移动，可以从列表中移除该链接")]
     FileMissing,
-    #[error("该文件夹已经绑定过了")]
+    #[error("该文件夹已经绑定过了，可以在侧边栏中管理已有绑定")]
     BindingExists,
-    #[error("文件夹不存在或无法访问")]
+    #[error("文件夹不存在或无法访问，请确认路径后重新扫描，或解除绑定")]
     BindingUnavailable,
-    #[error("无法打开文件：{0}")]
+    #[error("无法打开文件，请确认文件仍在原位置，或从列表中移除该链接")]
     OpenFailed(String),
-    #[error("找不到对应的记录")]
+    #[error("找不到对应的记录，请刷新后重试")]
     NotFound,
-    #[error("至少需要一个文件类型")]
+    #[error("至少需要一个文件类型，请填写后再保存")]
     EmptyExtensions,
-    #[error("保存数据失败：{0}")]
+    #[error("保存数据失败，请检查磁盘空间和文件权限后重试")]
     Io(#[from] std::io::Error),
 }
 ```
 
-序列化为 `{ code: "FileMissing", message: "文件不存在或已被移动" }`，前端直接展示 `message`。
+序列化为 `{ code: "FileMissing", message: "文件不存在或已被移动，可以从列表中移除该链接" }`，前端直接展示 `message`。系统错误细节不拼进用户可见文案。
 
 ---
 
@@ -446,11 +446,11 @@ pub enum AppError {
 
 ### 8.5 移除 link
 
-确认框文案：「从 File Link 中移除选中的 N 个链接？只删除链接，不会删除磁盘上的原文件。」→ `remove_links` → 带绑定来源的写入忽略名单 → 删除 link → `state-changed`。
+确认框文案：「从 File Link 中移除选中的 N 个链接？只删除链接，不删除原文件。」→ `remove_links` → 带绑定来源的写入忽略名单 → 删除 link → `state-changed`。
 
 ### 8.6 解除绑定
 
-确认框文案：「解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留，磁盘上的原文件不受影响。」→ `remove_binding` → 停止监视 → 去掉来源、删除空来源 link、清除该绑定的忽略记录 → `state-changed`。
+确认框文案：「解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留。只删除链接，不删除原文件。」→ `remove_binding` → 停止监视 → 去掉来源、删除空来源 link、清除该绑定的忽略记录 → `state-changed`。
 
 ---
 
@@ -471,7 +471,7 @@ pub enum AppError {
 
 - 侧边栏：全部 / 手动导入 / 各绑定文件夹（显示数量；悬停显示完整路径；右键菜单：扫描、自动导入开关、包含子文件夹开关、在资源管理器中打开、解除绑定）。
 - 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。
-- 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动」。
+- 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
 - 设置对话框：编辑扩展名列表（逗号分隔），保存时提示「新规则将在之后的扫描中生效」。
 
 ### 9.2 状态

@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { addBinding, previewBinding } from "../api/commands";
-import type { AppError } from "../types";
+import { errorMessage } from "../utils/error";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 const LARGE_COUNT = 500;
@@ -47,7 +47,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
       }
       await runBind();
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "绑定失败，请确认文件夹仍可访问后重试"));
     } finally {
       setBusy(false);
     }
@@ -58,7 +58,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
     try {
       await runBind();
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "绑定失败，请确认文件夹仍可访问后重试"));
     } finally {
       setBusy(false);
       setLargeCount(null);
@@ -136,13 +136,3 @@ const checkboxStyle: CSSProperties = {
   gap: 8,
   marginBottom: 10,
 };
-
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return "绑定失败";
-}

@@ -40,11 +40,13 @@ export async function subscribeWatcherEvents(handlers: {
   onStateChanged: () => void;
   onAutoImported: (payload: AutoImportedPayload) => void;
   onBindingUnavailable: (payload: BindingUnavailablePayload) => void;
+  onDataRecovered: (payload: DataRecoveredPayload) => void;
 }): Promise<UnlistenFn> {
   const unlistens = await Promise.all([
     onStateChanged(handlers.onStateChanged),
     onAutoImported(handlers.onAutoImported),
     onBindingUnavailable(handlers.onBindingUnavailable),
+    onDataRecovered(handlers.onDataRecovered),
   ]);
   return () => {
     for (const unlisten of unlistens) {

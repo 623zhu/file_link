@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 
 import { updateSettings } from "../api/commands";
 import { useStore } from "../store";
-import type { AppError } from "../types";
+import { errorMessage } from "../utils/error";
 
 interface SettingsDialogProps {
   onClose: () => void;
@@ -37,7 +37,7 @@ export function SettingsDialog({ onClose, onToast }: SettingsDialogProps) {
       onToast("新规则将在之后的扫描中生效");
       onClose();
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "保存失败，请检查填写内容后重试"));
     } finally {
       setBusy(false);
     }
@@ -109,13 +109,3 @@ const hintStyle: CSSProperties = {
   color: "#6b7280",
   fontSize: 12,
 };
-
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return "保存失败";
-}

@@ -3,7 +3,8 @@ import { useEffect, useState, type MouseEvent } from "react";
 
 import { removeBinding, scanBinding, updateBinding } from "../api/commands";
 import { useStore } from "../store";
-import type { AppError, Binding, View } from "../types";
+import type { Binding, View } from "../types";
+import { errorMessage } from "../utils/error";
 import { hasBindingSource, hasManualSource } from "../utils/filter";
 import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -19,7 +20,7 @@ interface MenuState {
 }
 
 const UNBIND_MESSAGE =
-  "解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留，磁盘上的原文件不受影响。";
+  "解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留。只删除链接，不删除原文件。";
 
 export function Sidebar({ onToast }: SidebarProps) {
   const links = useStore((state) => state.snapshot?.links);
@@ -54,7 +55,7 @@ export function Sidebar({ onToast }: SidebarProps) {
         `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
       );
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "扫描失败，请确认文件夹仍可访问后重试"));
     }
   }
 
@@ -67,7 +68,7 @@ export function Sidebar({ onToast }: SidebarProps) {
         onToast(NETWORK_WATCH_HINT);
       }
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "更新绑定失败，请稍后重试"));
     }
   }
 
@@ -76,7 +77,7 @@ export function Sidebar({ onToast }: SidebarProps) {
     try {
       await updateBinding(binding.id, { recursive: !binding.recursive });
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "更新绑定失败，请稍后重试"));
     }
   }
 
@@ -88,7 +89,9 @@ export function Sidebar({ onToast }: SidebarProps) {
         with: null,
       });
     } catch (err) {
-      onToast(errorMessage(err, "无法在资源管理器中打开该文件夹"));
+      onToast(
+        errorMessage(err, "无法在资源管理器中打开该文件夹，请确认目录仍存在"),
+      );
     }
   }
 
@@ -104,7 +107,7 @@ export function Sidebar({ onToast }: SidebarProps) {
         setView({ type: "all" });
       }
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "解除绑定失败，请稍后重试"));
     }
   }
 
@@ -267,14 +270,4 @@ function SidebarItem({
 
 function setView(view: View) {
   useStore.setState({ view });
-}
-
-function errorMessage(err: unknown, fallback = "操作失败"): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return fallback;
 }

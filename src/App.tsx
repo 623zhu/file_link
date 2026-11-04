@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Toast } from "./components/Toast";
 import { Toolbar } from "./components/Toolbar";
 import { useStore } from "./store";
+import { dataRecoveredMessage } from "./utils/error";
 import { autoImportedMessage } from "./utils/path";
 import "./styles/app.css";
 
@@ -23,41 +24,44 @@ function App() {
     let cancelled = false;
     let unlisten: (() => void) | undefined;
 
-    void refresh();
-
-    void subscribeWatcherEvents({
-      onStateChanged: () => {
-        void refresh();
-      },
-      onAutoImported: (payload) => {
-        const binding = useStore
-          .getState()
-          .snapshot?.bindings.find((item) => item.id === payload.bindingId);
-        showToast(autoImportedMessage(binding?.path, payload.added));
-      },
-      onBindingUnavailable: (payload) => {
-        const snapshot = useStore.getState().snapshot;
-        if (snapshot) {
-          useStore.setState({
-            snapshot: {
-              ...snapshot,
-              bindings: snapshot.bindings.map((binding) =>
-                binding.id === payload.bindingId
-                  ? { ...binding, unavailable: true }
-                  : binding,
-              ),
-            },
-          });
-        }
-        void refresh();
-      },
-    }).then((fn) => {
+    void (async () => {
+      const fn = await subscribeWatcherEvents({
+        onStateChanged: () => {
+          void refresh();
+        },
+        onAutoImported: (payload) => {
+          const binding = useStore
+            .getState()
+            .snapshot?.bindings.find((item) => item.id === payload.bindingId);
+          showToast(autoImportedMessage(binding?.path, payload.added));
+        },
+        onBindingUnavailable: (payload) => {
+          const snapshot = useStore.getState().snapshot;
+          if (snapshot) {
+            useStore.setState({
+              snapshot: {
+                ...snapshot,
+                bindings: snapshot.bindings.map((binding) =>
+                  binding.id === payload.bindingId
+                    ? { ...binding, unavailable: true }
+                    : binding,
+                ),
+              },
+            });
+          }
+          void refresh();
+        },
+        onDataRecovered: (payload) => {
+          showToast(dataRecoveredMessage(payload.backupPath));
+        },
+      });
       if (cancelled) {
         fn();
         return;
       }
       unlisten = fn;
-    });
+      await refresh();
+    })();
 
     return () => {
       cancelled = true;

@@ -14,7 +14,8 @@ import {
   useStore,
   type SelectMode,
 } from "../store";
-import type { AppError, Binding, Link } from "../types";
+import type { Binding, Link } from "../types";
+import { errorMessage } from "../utils/error";
 import { filterLinks } from "../utils/filter";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LinkRow } from "./LinkRow";
@@ -109,7 +110,12 @@ export function LinkList({ onToast }: LinkListProps) {
       try {
         await openLink(id);
       } catch (err) {
-        onToast(errorMessage(err));
+        onToast(
+          errorMessage(
+            err,
+            "打开失败，请确认文件仍在原位置，或从列表中移除该链接",
+          ),
+        );
       }
     }
   }
@@ -130,7 +136,7 @@ export function LinkList({ onToast }: LinkListProps) {
       }
       useStore.setState({ selectedIds: remain });
     } catch (err) {
-      onToast(errorMessage(err));
+      onToast(errorMessage(err, "移除链接失败，请稍后重试"));
     }
   }
 
@@ -214,20 +220,10 @@ export function LinkList({ onToast }: LinkListProps) {
       </div>
       <ConfirmDialog
         open={confirming}
-        message={`从 File Link 中移除选中的 ${selectedVisibleIds.length} 个链接？只删除链接，不会删除磁盘上的原文件。`}
+        message={`从 File Link 中移除选中的 ${selectedVisibleIds.length} 个链接？只删除链接，不删除原文件。`}
         onConfirm={() => void handleRemoveSelected()}
         onCancel={() => setConfirming(false)}
       />
     </section>
   );
-}
-
-function errorMessage(err: unknown): string {
-  if (err && typeof err === "object" && "message" in err) {
-    const message = (err as AppError).message;
-    if (typeof message === "string" && message.length > 0) {
-      return message;
-    }
-  }
-  return "操作失败";
 }
