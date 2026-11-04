@@ -14,11 +14,13 @@ use crate::core::rule;
 use crate::core::scanner;
 use crate::core::store;
 use crate::error::AppError;
+use crate::watcher::WatcherManager;
 
 pub struct AppState {
     data: Mutex<Data>,
     data_path: PathBuf,
     recovery_path: Mutex<Option<PathBuf>>,
+    pub(crate) watcher: WatcherManager,
 }
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
@@ -73,6 +75,7 @@ impl AppState {
             data: Mutex::new(data),
             data_path,
             recovery_path: Mutex::new(recovery_path),
+            watcher: WatcherManager::new(),
         }
     }
 }
@@ -250,7 +253,7 @@ pub fn add_binding(
     };
     let binding = new_binding(display, key, recursive, auto_watch);
     let files = scan_files(&binding, &settings)?;
-    write(state, |data| {
+    let result = write(state, |data| {
         if data
             .bindings
             .iter()
@@ -265,7 +268,9 @@ pub fn add_binding(
             binding: added_binding,
             added: summary.added,
         })
-    })
+    })?;
+    sync_watcher(state, &result.binding);
+    Ok(result)
 }
 
 pub fn update_binding(
@@ -290,7 +295,7 @@ pub fn update_binding(
         None
     };
 
-    write(state, |data| {
+    let result = write(state, |data| {
         {
             let current = data
                 .bindings
@@ -309,11 +314,13 @@ pub fn update_binding(
             reconcile::reconcile(data, id, files, file_exists);
         }
         find_binding(data, id).cloned()
-    })
+    })?;
+    sync_watcher(state, &result);
+    Ok(result)
 }
 
 pub fn remove_binding(state: &AppState, id: &str) -> Result<RemoveBindingResult, AppError> {
-    write(state, |data| {
+    let result = write(state, |data| {
         if !data.bindings.iter().any(|binding| binding.id == id) {
             return Err(AppError::NotFound);
         }
@@ -321,10 +328,16 @@ pub fn remove_binding(state: &AppState, id: &str) -> Result<RemoveBindingResult,
         Ok(RemoveBindingResult {
             removed_links: reconcile::unbind(data, id),
         })
-    })
+    })?;
+    state.watcher.stop(id);
+    Ok(result)
 }
 
 pub fn scan_binding(state: &AppState, id: &str) -> Result<ReconcileSummary, AppError> {
+    reconcile_binding(state, id)
+}
+
+pub fn reconcile_binding(state: &AppState, id: &str) -> Result<ReconcileSummary, AppError> {
     let (binding, settings) = {
         let data = lock(&state.data)?;
         (find_binding(&data, id)?.clone(), data.settings.clone())
@@ -428,6 +441,16 @@ fn new_binding(display: String, key: String, recursive: bool, auto_watch: bool) 
 fn scan_files(binding: &Binding, settings: &Settings) -> Result<Vec<(String, String)>, AppError> {
     let rule = rule::effective_rule(binding, settings);
     scanner::scan(&binding.path, binding.recursive, &rule).map_err(|_| AppError::BindingUnavailable)
+}
+
+fn sync_watcher(state: &AppState, binding: &Binding) {
+    if let Err(err) = state.watcher.restart(binding) {
+        log::warn!(
+            "failed to start folder watcher for {} at {}: {err}",
+            binding.id,
+            binding.path
+        );
+    }
 }
 
 fn file_exists(path: &str) -> bool {

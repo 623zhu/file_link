@@ -29,6 +29,7 @@ pub fn run() {
         }))
         .setup(|app| {
             service::bootstrap(app)?;
+            watcher::start_app_worker(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
