@@ -8,6 +8,7 @@ pub use core::model::{Binding, Data, Ignore, Link, Settings, Source};
 pub use core::path::normalize;
 pub use core::store::{LoadResult, load, save};
 pub use error::AppError;
+pub use service::{AppState, Snapshot, write, write_and_emit};
 
 use tauri::Manager;
 
@@ -23,6 +24,11 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .setup(|app| {
+            service::bootstrap(app)?;
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![commands::get_snapshot])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
