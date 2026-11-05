@@ -1,0 +1,35 @@
+# Changelog
+
+本文件记录 File Link 的所有后续更改。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
+
+未发布的更改写在 `[Unreleased]`。发布时把该段收成对应版本号小节，并另开空的 `[Unreleased]`。
+
+分类：`Added` 新增、`Changed` 变更、`Fixed` 修复、`Removed` 移除、`Security` 安全。
+
+---
+
+## [Unreleased]
+
+### Added
+
+- 新增本变更日志，并规定后续更改必须写入本文件。
+
+## [0.1.0] - 2026-11-04
+
+首个免安装版：`FileLink_0.1.0_x64_portable.exe`。
+
+### Added
+
+- 手动导入文件为链接；绑定文件夹后按类型规则生成链接。
+- 自动导入或手动扫描新文件；写入未完成的文件会跳过对账。
+- 打开、在资源管理器中定位、移除链接（只删除链接，不删除原文件）。
+- 按名称和路径搜索、多选批量操作、键盘操作、长列表虚拟滚动。
+- 文件类型可配置；链接失效时标记「缺失」。
+- 自定义应用图标；release 构建无控制台窗口。
+- 应用日志记录扫描、对账与监视。
+
+### Known
+
+- 可执行文件尚未代码签名，首次运行可能触发 Windows SmartScreen。
+- 免安装版不能自动补装 WebView2。
+- 安装程序与代码签名安排在后续版本。
