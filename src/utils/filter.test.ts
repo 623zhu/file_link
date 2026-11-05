@@ -28,7 +28,7 @@ const links: Link[] = [
   link("only-manual", [manual]),
   link("only-binding", [binding]),
   link("both", [manual, binding]),
-  link("missing-manual", [manual], true),
+  link("missing-binding", [binding], true),
   link("other-binding", [otherBinding]),
 ];
 
@@ -37,28 +37,15 @@ function ids(result: Link[]): string[] {
 }
 
 describe("filterLinks", () => {
-  it("returns every link for the all view, sorted", () => {
-    expect(ids(filterLinks(links, { type: "all" }))).toEqual([
-      "both",
-      "only-binding",
-      "only-manual",
-      "other-binding",
-      "missing-manual",
-    ]);
-  });
-
-  it("keeps only links with a manual source for the manual view", () => {
-    expect(ids(filterLinks(links, { type: "manual" }))).toEqual([
-      "both",
-      "only-manual",
-      "missing-manual",
-    ]);
+  it("returns no links when no binding is selected", () => {
+    expect(ids(filterLinks(links, { type: "none" }))).toEqual([]);
   });
 
   it("keeps links that include the selected binding", () => {
     expect(ids(filterLinks(links, { type: "binding", id: "b1" }))).toEqual([
       "both",
       "only-binding",
+      "missing-binding",
     ]);
   });
 
@@ -67,53 +54,23 @@ describe("filterLinks", () => {
       "other-binding",
     ]);
   });
-});
 
-describe("filterLinks search", () => {
-  it("matches name case-insensitively", () => {
-    expect(ids(filterLinks(links, { type: "all" }, "BOTH"))).toEqual(["both"]);
-  });
-
-  it("matches path case-insensitively", () => {
-    const mixed: Link[] = [
-      link("alpha", [manual], false, {
-        name: "alpha.html",
-        path: "D:\\notes\\alpha.html",
-      }),
-      link("report", [manual], false, {
-        name: "q1.html",
-        path: "D:\\Reports\\q1.html",
-      }),
-    ];
-    expect(ids(filterLinks(mixed, { type: "all" }, "reports"))).toEqual([
-      "report",
-    ]);
-  });
-
-  it("treats blank query as no search filter", () => {
-    expect(ids(filterLinks(links, { type: "all" }, "   "))).toEqual(
-      ids(filterLinks(links, { type: "all" })),
+  it("hides links that only have a manual source", () => {
+    expect(ids(filterLinks(links, { type: "binding", id: "b1" }))).not.toContain(
+      "only-manual",
     );
-  });
-
-  it("applies the current view before searching", () => {
-    expect(ids(filterLinks(links, { type: "manual" }, "binding"))).toEqual([]);
-    expect(ids(filterLinks(links, { type: "all" }, "binding"))).toEqual([
-      "only-binding",
-      "other-binding",
-    ]);
   });
 });
 
 describe("filterLinks sort", () => {
   it("puts missing links last and sorts the rest by name", () => {
     const unsorted: Link[] = [
-      link("zeta", [manual]),
-      link("alpha", [manual], true),
-      link("Beta", [manual]),
-      link("gamma", [manual], true),
+      link("zeta", [binding]),
+      link("alpha", [binding], true),
+      link("Beta", [binding]),
+      link("gamma", [binding], true),
     ];
-    expect(ids(filterLinks(unsorted, { type: "all" }))).toEqual([
+    expect(ids(filterLinks(unsorted, { type: "binding", id: "b1" }))).toEqual([
       "Beta",
       "zeta",
       "alpha",

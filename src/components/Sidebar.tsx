@@ -5,7 +5,7 @@ import { removeBinding, scanBinding, updateBinding } from "../api/commands";
 import { useStore } from "../store";
 import type { Binding, View } from "../types";
 import { errorMessage } from "../utils/error";
-import { hasBindingSource, hasManualSource } from "../utils/filter";
+import { hasBindingSource } from "../utils/filter";
 import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -20,7 +20,7 @@ interface MenuState {
 }
 
 const UNBIND_MESSAGE =
-  "解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留。只删除链接，不删除原文件。";
+  "解除绑定后，将移除由该文件夹自动生成的链接。只删除链接，不删除原文件。";
 
 export function Sidebar({ onToast }: SidebarProps) {
   const links = useStore((state) => state.snapshot?.links);
@@ -28,9 +28,6 @@ export function Sidebar({ onToast }: SidebarProps) {
   const view = useStore((state) => state.view);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [unbinding, setUnbinding] = useState<Binding | null>(null);
-
-  const allCount = links?.length ?? 0;
-  const manualCount = links?.filter(hasManualSource).length ?? 0;
 
   useEffect(() => {
     if (!menu) {
@@ -103,9 +100,6 @@ export function Sidebar({ onToast }: SidebarProps) {
     setUnbinding(null);
     try {
       await removeBinding(id);
-      if (view.type === "binding" && view.id === id) {
-        setView({ type: "all" });
-      }
     } catch (err) {
       onToast(errorMessage(err, "解除绑定失败，请稍后重试"));
     }
@@ -113,18 +107,6 @@ export function Sidebar({ onToast }: SidebarProps) {
 
   return (
     <nav className="sidebar" aria-label="链接来源">
-      <SidebarItem
-        label="全部链接"
-        count={allCount}
-        active={view.type === "all"}
-        onSelect={() => setView({ type: "all" })}
-      />
-      <SidebarItem
-        label="手动导入"
-        count={manualCount}
-        active={view.type === "manual"}
-        onSelect={() => setView({ type: "manual" })}
-      />
       <div className="sidebar-group">
         <div className="sidebar-group-title">文件夹</div>
         {bindings.map((binding) => (

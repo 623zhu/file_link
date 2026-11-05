@@ -1,9 +1,9 @@
 # File Link 开发文档
 
-**对应 PRD：** `docs/PRD.md` v0.1  
-**文档版本：** 0.1  
+**对应 PRD：** `docs/PRD.md` v0.2  
+**文档版本：** 0.2  
 **状态：** 草案  
-**日期：** 2026-11-04
+**日期：** 2026-11-05
 
 ---
 
@@ -79,15 +79,15 @@ file_link/
 │  ├─ types.ts                  # 与 Rust 模型对应的 TS 类型
 │  ├─ store.ts                  # Zustand store
 │  ├─ components/
-│  │  ├─ Sidebar.tsx            # 全部 / 手动导入 / 绑定文件夹列表
-│  │  ├─ Toolbar.tsx            # 搜索、导入、绑定、扫描
+│  │  ├─ Sidebar.tsx            # 绑定文件夹列表
+│  │  ├─ Toolbar.tsx            # 绑定、扫描、设置
 │  │  ├─ LinkList.tsx           # 虚拟列表
 │  │  ├─ LinkRow.tsx
 │  │  ├─ ConfirmDialog.tsx
 │  │  ├─ SettingsDialog.tsx     # 文件类型配置
 │  │  └─ Toast.tsx
 │  ├─ utils/
-│  │  └─ filter.ts              # 视图过滤 + 搜索
+│  │  └─ filter.ts              # 按绑定过滤与排序
 │  └─ styles/
 └─ src-tauri/                   # 后端
    ├─ Cargo.toml
@@ -372,7 +372,7 @@ for link in 含该绑定来源的 links:
 | Command | 参数 | 返回 | 说明 |
 | --- | --- | --- | --- |
 | `get_snapshot` | — | `Snapshot` | 获取全部数据 |
-| `import_files` | `paths: string[]` | `{ added, skipped }` | 手动导入；已存在则补 `Manual` 来源并计入 skipped |
+| `import_files` | `paths: string[]` | `{ added, skipped }` | 后端保留以兼容旧数据；界面不再调用 |
 | `preview_binding` | `path, recursive` | `{ count }` | 绑定前预扫描，返回命中数量 |
 | `add_binding` | `path, recursive, autoWatch` | `{ binding, added }` | 绑定并首次扫描；同一目录已绑定时报错 |
 | `update_binding` | `id, recursive?, autoWatch?` | `Binding` | 修改后重建监视；改 `recursive` 后立即对账 |
@@ -433,7 +433,7 @@ pub enum AppError {
 
 ### 8.2 手动导入
 
-前端打开多选文件框（默认过滤器为当前扩展名列表，另提供「所有文件」）→ `import_files` → 对每个路径规范化：已有 link 则补 `Manual` 来源，否则新建 → 保存 → `state-changed` → Toast「已导入 N 个，跳过 M 个已存在」。
+界面不再提供手动导入入口。后端仍保留 `import_files`，以兼容已有数据中的 `Manual` 来源；仅手动来源的链接不再出现在列表中。
 
 ### 8.3 绑定文件夹
 
@@ -450,7 +450,7 @@ pub enum AppError {
 
 ### 8.6 解除绑定
 
-确认框文案：「解除绑定后，将移除由该文件夹自动生成的链接。手动导入的链接会保留。只删除链接，不删除原文件。」→ `remove_binding` → 停止监视 → 去掉来源、删除空来源 link、清除该绑定的忽略记录 → `state-changed`。
+确认框文案：「解除绑定后，将移除由该文件夹自动生成的链接。只删除链接，不删除原文件。」→ `remove_binding` → 停止监视 → 去掉来源、删除空来源 link、清除该绑定的忽略记录 → `state-changed`。
 
 ---
 
@@ -460,17 +460,17 @@ pub enum AppError {
 
 ```
 ┌──────────────┬──────────────────────────────────────────────┐
-│ 全部链接 (n) │ [搜索文件名或路径……] [导入文件] [绑定文件夹] [扫描新文件] [⚙] │
-│ 手动导入 (n) ├──────────────────────────────────────────────┤
-│ ── 文件夹 ── │ 名称        路径               来源      加入时间   │
-│  tools  (n)  │ json.html   D:\tools\json.html 文件夹    11-04 15:00 │
-│  report (n)  │ old.html    D:\a\old.html      手动  [缺失]          │
-│              │                                              │
+│ ── 文件夹 ── │ [绑定文件夹] [扫描新文件] [⚙]                │
+│  tools  (n)  ├──────────────────────────────────────────────┤
+│  report (n)  │ 名称        路径               来源      加入时间   │
+│              │ json.html   D:\tools\json.html 文件夹    11-04 15:00 │
+│              │ old.html    D:\tools\old.html  文件夹 [缺失]        │
 └──────────────┴──────────────────────────────────────────────┘
 ```
 
-- 侧边栏：全部 / 手动导入 / 各绑定文件夹（显示数量；悬停显示完整路径；右键菜单：扫描、自动导入开关、包含子文件夹开关、在资源管理器中打开、解除绑定）。
-- 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。
+- 侧边栏：各绑定文件夹（显示数量；悬停显示完整路径；右键菜单：扫描、自动导入开关、包含子文件夹开关、在资源管理器中打开、解除绑定）。不提供「全部链接」「手动导入」。
+- 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。
+- 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
 - 设置对话框：编辑扩展名列表（逗号分隔），保存时提示「新规则将在之后的扫描中生效」。
 
@@ -479,14 +479,14 @@ pub enum AppError {
 ```ts
 interface UiState {
   snapshot: Snapshot | null;
-  view: { type: "all" } | { type: "manual" } | { type: "binding"; id: string };
-  query: string;
+  view: { type: "binding"; id: string } | { type: "none" };
   selectedIds: Set<string>;
 }
 ```
 
-- 列表数据 = `filter(snapshot.links, view, query)`，放在 `utils/filter.ts`，纯函数，便于单测。
-- 搜索对 `name` 和 `path` 做不区分大小写的子串匹配。
+- 列表数据 = `filter(snapshot.links, view)`，放在 `utils/filter.ts`，纯函数，便于单测。
+- 只显示当前选中绑定的链接；无绑定时列表为空。
+- 启动或当前绑定被解除后，选中剩余的第一个绑定；一个都没有则为 `none`。
 - 列表默认排序：缺失的排在后面，其余按名称排序。
 
 ### 9.3 文案原则
@@ -520,11 +520,11 @@ interface UiState {
 
 ### 10.3 前端
 
-`vitest` 测试 `utils/filter.ts`（视图过滤、搜索、排序）。
+`vitest` 测试 `utils/filter.ts`（按绑定过滤、排序）。
 
 ### 10.4 手动验收（对应 PRD 第 9 节）
 
-1. 导入一个 HTML，关闭资源管理器，从 File Link 打开，默认浏览器显示该页面。
+1. 绑定一个含 HTML 的文件夹，关闭资源管理器，从 File Link 打开其中一条链接，默认浏览器显示该页面。
 2. 绑定一个含多个 HTML 的文件夹，列表数量与目录中 HTML 数量一致。
 3. 自动导入开启时，向该文件夹复制一个新 HTML，数秒内列表出现；关闭自动导入后再复制一个，点「扫描新文件」后出现。
 4. 移除一个 link，确认原文件仍在原路径。
@@ -543,7 +543,7 @@ interface UiState {
 | M1 骨架 | Tauri 项目初始化、`core/model` `path` `store`、手动导入、列表、打开、定位、移除 | 验收 1、4、5 通过 |
 | M2 绑定 | `rule` `scanner` `reconcile`、绑定 / 解除绑定、预扫描确认、忽略名单、侧边栏视图 | 验收 2、6 通过 |
 | M3 监视 | `watcher`、防抖与写入稳定检查、启动补扫、全量状态检查、缺失标记、自动导入提示 | 验收 3、7 通过 |
-| M4 打磨 | 搜索、设置对话框、错误与确认文案、多选批量操作、长列表虚拟滚动、日志、应用图标、release 配置 | 全部验收通过，`core` 单测全绿，免安装版 exe 在干净的 Windows 10/11 上能运行 |
+| M4 打磨 | 设置对话框、错误与确认文案、多选批量操作、长列表虚拟滚动、日志、应用图标、release 配置、精简浏览入口 | 全部验收通过，`core` 单测全绿，免安装版 exe 在干净的 Windows 10/11 上能运行 |
 | M5 分发（MVP 之后） | NSIS 安装程序、WebView2 引导安装、代码签名 | 安装、启动、卸载流程走通，卸载后原文件不受影响 |
 
 ---
@@ -698,5 +698,5 @@ PRD 第 11 节的待确认项，开发先按以下默认值实现，确认后只
 | --- | --- | --- |
 | 绑定后默认自动监视还是手动扫描 | 默认开启自动导入 | 监视开销小，新文件自动出现更符合预期 |
 | 子文件夹默认包含还是只扫一层 | 默认包含 | 配合内置忽略目录和超过 500 个时的二次确认，避免误扫大目录 |
-| 列表还是卡片 | 列表 | 以搜索和打开为主，列表信息密度更高 |
+| 列表还是卡片 | 列表 | 以浏览和打开为主，列表信息密度更高 |
 | 产品名 | File Link，中文名「文件链接」 | 沿用 PRD 暂定名 |

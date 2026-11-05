@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 import { getSnapshot } from "./api/commands";
-import type { Snapshot, View } from "./types";
+import type { Binding, Snapshot, View } from "./types";
 
 export type SelectMode = "replace" | "toggle" | "range" | "add-range";
 
@@ -13,21 +13,33 @@ export interface SelectionState {
 interface Store {
   snapshot: Snapshot | null;
   view: View;
-  query: string;
   selectedIds: Set<string>;
   refresh: () => Promise<void>;
 }
 
 export const useStore = create<Store>((set) => ({
   snapshot: null,
-  view: { type: "all" },
-  query: "",
+  view: { type: "none" },
   selectedIds: new Set(),
   refresh: async () => {
     const snapshot = await getSnapshot();
-    set({ snapshot });
+    set((state) => ({
+      snapshot,
+      view: resolveView(state.view, snapshot.bindings),
+    }));
   },
 }));
+
+export function resolveView(
+  view: View,
+  bindings: readonly Binding[],
+): View {
+  if (view.type === "binding" && bindings.some((item) => item.id === view.id)) {
+    return view;
+  }
+  const first = bindings[0];
+  return first ? { type: "binding", id: first.id } : { type: "none" };
+}
 
 export function selectionModeFromEvent(event: {
   shiftKey: boolean;

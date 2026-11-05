@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { addBinding, previewBinding } from "../api/commands";
+import { useStore } from "../store";
 import { errorMessage } from "../utils/error";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -33,6 +34,9 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
 
   async function runBind() {
     const result = await addBinding(path, recursive, autoWatch);
+    useStore.setState({
+      view: { type: "binding", id: result.binding.id },
+    });
     onToast(`已绑定，导入 ${result.added} 个文件`);
     onClose();
   }
