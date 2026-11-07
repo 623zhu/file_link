@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 use std::path::Path;
 
-use chrono::Local;
 use serde::Serialize;
 use uuid::Uuid;
 
 use super::model::{Data, Link, Source};
+use super::path;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -33,6 +33,9 @@ pub fn reconcile(
         }
         if let Some(link) = data.links.iter_mut().find(|link| link.key == *key) {
             link.add_source(source.clone());
+            if let Some(mtime) = path::try_file_modified_at(display) {
+                link.modified_at = mtime;
+            }
             if link.missing {
                 link.missing = false;
                 summary.restored += 1;
@@ -44,7 +47,7 @@ pub fn reconcile(
                 key: key.clone(),
                 name: file_name(display),
                 sources: vec![source.clone()],
-                added_at: Local::now(),
+                modified_at: path::file_modified_at(display),
                 missing: false,
             });
             summary.added += 1;
@@ -107,8 +110,9 @@ fn file_name(path: &str) -> String {
 mod tests {
     use super::*;
     use crate::core::model::Ignore;
-    use chrono::TimeZone;
+    use chrono::{Local, TimeZone};
     use std::collections::HashSet;
+    use std::fs;
 
     const BINDING: &str = "b1";
     const OTHER: &str = "b2";
@@ -131,7 +135,7 @@ mod tests {
             key,
             name: name.to_string(),
             sources,
-            added_at: sample_time(),
+            modified_at: sample_time(),
             missing,
         }
     }
@@ -322,5 +326,31 @@ mod tests {
             .unwrap();
         assert!(!present_link.missing);
         assert!(absent_link.missing);
+    }
+
+    #[test]
+    fn new_and_existing_links_use_file_modified_at() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("page.html");
+        fs::write(&file_path, "ok").unwrap();
+        let (display, key) = crate::core::path::normalize(&file_path).unwrap();
+        let mut data = Data::default();
+
+        reconcile(
+            &mut data,
+            BINDING,
+            &[(display.clone(), key.clone())],
+            always_exists,
+        );
+
+        let expected = crate::core::path::file_modified_at(&display);
+        assert_eq!(data.links[0].modified_at.timestamp(), expected.timestamp());
+
+        data.links[0].modified_at = sample_time();
+        fs::write(&file_path, "updated").unwrap();
+        reconcile(&mut data, BINDING, &[(display.clone(), key)], always_exists);
+        let updated = crate::core::path::file_modified_at(&display);
+        assert_eq!(data.links[0].modified_at.timestamp(), updated.timestamp());
+        assert_ne!(data.links[0].modified_at, sample_time());
     }
 }

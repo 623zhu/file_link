@@ -202,6 +202,7 @@ fn import_one(data: &mut Data, raw: &str) -> ImportOutcome {
         .file_name()
         .map(|name| name.to_string_lossy().into_owned())
         .unwrap_or_else(|| display.clone());
+    let modified_at = path::file_modified_at(&display);
 
     data.links.push(Link {
         id: Uuid::new_v4().to_string(),
@@ -209,7 +210,7 @@ fn import_one(data: &mut Data, raw: &str) -> ImportOutcome {
         key,
         name,
         sources: vec![Source::Manual],
-        added_at: Local::now(),
+        modified_at,
         missing: false,
     });
     ImportOutcome::Added
@@ -889,6 +890,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = write_html(dir.path(), "shared.html");
         let (display, key) = path::normalize(&path).unwrap();
+        let modified_at = path::file_modified_at(&display);
         let mut data = Data::default();
         data.links.push(Link {
             id: "existing".to_string(),
@@ -898,7 +900,7 @@ mod tests {
             sources: vec![Source::Binding {
                 binding_id: "b1".to_string(),
             }],
-            added_at: Local::now(),
+            modified_at,
             missing: false,
         });
 
@@ -952,7 +954,7 @@ mod tests {
             key: key.to_string(),
             name: format!("{id}.html"),
             sources,
-            added_at: Local::now(),
+            modified_at: Local::now(),
             missing: false,
         }
     }
@@ -1200,6 +1202,7 @@ mod tests {
     fn seed_link(state: &AppState, file: &Path, binding_id: &str) -> Link {
         let (display, key) = path::normalize(file).unwrap();
         let name = file.file_name().unwrap().to_string_lossy().into_owned();
+        let modified_at = path::file_modified_at(&display);
         let link = Link {
             id: Uuid::new_v4().to_string(),
             path: display,
@@ -1208,7 +1211,7 @@ mod tests {
             sources: vec![Source::Binding {
                 binding_id: binding_id.to_string(),
             }],
-            added_at: Local::now(),
+            modified_at,
             missing: false,
         };
         let saved = link.clone();

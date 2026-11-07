@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { openLink, revealLink } from "../api/commands";
-import type { Binding, Link, Source } from "../types";
+import type { Link } from "../types";
 import { errorMessage } from "../utils/error";
 
 interface LinkRowProps {
   link: Link;
-  bindings: Binding[];
   selected: boolean;
   onSelect: (event: {
     shiftKey: boolean;
@@ -25,7 +24,6 @@ interface MenuPosition {
 
 export function LinkRow({
   link,
-  bindings,
   selected,
   onSelect,
   onEnsureSelected,
@@ -84,7 +82,6 @@ export function LinkRow({
     }
   }
 
-  const source = sourceLabel(link.sources, bindings);
   const className = [
     "link-row",
     link.missing ? "missing" : "",
@@ -127,10 +124,7 @@ export function LinkRow({
       <div className="link-cell" title={link.path}>
         {link.path}
       </div>
-      <div className="link-cell" title={source}>
-        {source}
-      </div>
-      <div className="link-cell">{formatAddedAt(link.addedAt)}</div>
+      <div className="link-cell">{formatModifiedAt(link.modifiedAt)}</div>
       {menu ? (
         <div
           className="context-menu"
@@ -174,28 +168,7 @@ export function LinkRow({
   );
 }
 
-function sourceLabel(sources: Source[], bindings: Binding[]): string {
-  const labels: string[] = [];
-  for (const source of sources) {
-    if (source.type === "manual") {
-      labels.push("手动");
-      continue;
-    }
-    const binding = bindings.find((item) => item.id === source.bindingId);
-    labels.push(folderName(binding?.path) ?? "文件夹");
-  }
-  return labels.join(" ");
-}
-
-function folderName(path: string | undefined): string | undefined {
-  if (!path) {
-    return undefined;
-  }
-  const parts = path.split(/[\\/]/).filter((part) => part.length > 0);
-  return parts[parts.length - 1];
-}
-
-function formatAddedAt(value: string): string {
+function formatModifiedAt(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;

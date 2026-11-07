@@ -7,7 +7,7 @@ export interface Link {
   key: string;
   name: string;
   sources: Source[];
-  addedAt: string;
+  modifiedAt: string;
   missing: boolean;
 }
 

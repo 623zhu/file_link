@@ -14,14 +14,13 @@ import {
   useStore,
   type SelectMode,
 } from "../store";
-import type { Binding, Link } from "../types";
+import type { Link } from "../types";
 import { errorMessage } from "../utils/error";
 import { filterLinks } from "../utils/filter";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LinkRow } from "./LinkRow";
 
 const EMPTY_LINKS: Link[] = [];
-const EMPTY_BINDINGS: Binding[] = [];
 const ROW_HEIGHT = 36;
 
 interface LinkListProps {
@@ -30,8 +29,6 @@ interface LinkListProps {
 
 export function LinkList({ onToast }: LinkListProps) {
   const links = useStore((state) => state.snapshot?.links) ?? EMPTY_LINKS;
-  const bindings =
-    useStore((state) => state.snapshot?.bindings) ?? EMPTY_BINDINGS;
   const view = useStore((state) => state.view);
   const selectedIds = useStore((state) => state.selectedIds);
   const visible = useMemo(() => filterLinks(links, view), [links, view]);
@@ -164,8 +161,7 @@ export function LinkList({ onToast }: LinkListProps) {
       <div className="link-header">
         <div>名称</div>
         <div>路径</div>
-        <div>来源</div>
-        <div>加入时间</div>
+        <div>修改时间</div>
       </div>
       <div
         className="link-body"
@@ -203,7 +199,6 @@ export function LinkList({ onToast }: LinkListProps) {
                 >
                   <LinkRow
                     link={link}
-                    bindings={bindings}
                     selected={selectedIds.has(link.id)}
                     onSelect={(event) => handleSelect(link.id, event)}
                     onEnsureSelected={() => handleEnsureSelected(link.id)}

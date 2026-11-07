@@ -1,6 +1,8 @@
 use std::io;
 use std::path::Path;
 
+use chrono::{DateTime, Local};
+
 pub fn normalize(path: impl AsRef<Path>) -> io::Result<(String, String)> {
     let canonical = dunce::canonicalize(path)?;
     let display = to_display(&canonical);
@@ -16,6 +18,17 @@ fn to_display(path: &Path) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+pub fn try_file_modified_at(path: impl AsRef<Path>) -> Option<DateTime<Local>> {
+    std::fs::metadata(path)
+        .ok()
+        .and_then(|meta| meta.modified().ok())
+        .map(DateTime::<Local>::from)
+}
+
+pub fn file_modified_at(path: impl AsRef<Path>) -> DateTime<Local> {
+    try_file_modified_at(path).unwrap_or_else(Local::now)
 }
 
 fn is_drive_root(path: &str) -> bool {
@@ -91,5 +104,13 @@ mod tests {
         let missing = dir.path().join("missing.html");
         let err = normalize(&missing).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::NotFound);
+        assert!(try_file_modified_at(&missing).is_none());
+    }
+
+    #[test]
+    fn file_modified_at_reads_existing_file() {
+        let (_dir, file) = temp_file();
+        let mtime = try_file_modified_at(&file).expect("mtime");
+        assert!(mtime <= Local::now());
     }
 }

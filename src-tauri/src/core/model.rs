@@ -1,6 +1,10 @@
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 
+fn default_modified_at() -> DateTime<Local> {
+    Local::now()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
@@ -14,7 +18,7 @@ pub struct Data {
 impl Default for Data {
     fn default() -> Self {
         Self {
-            version: 3,
+            version: 4,
             settings: Settings::default(),
             bindings: Vec::new(),
             links: Vec::new(),
@@ -67,7 +71,8 @@ pub struct Link {
     pub key: String,
     pub name: String,
     pub sources: Vec<Source>,
-    pub added_at: DateTime<Local>,
+    #[serde(default = "default_modified_at", alias = "addedAt")]
+    pub modified_at: DateTime<Local>,
     #[serde(default)]
     pub missing: bool,
 }
@@ -139,14 +144,14 @@ mod tests {
             key: r"d:\tools\json.html".to_string(),
             name: "json.html".to_string(),
             sources: vec![Source::Manual],
-            added_at: sample_time(),
+            modified_at: sample_time(),
             missing: false,
         }
     }
 
     fn sample_data() -> Data {
         Data {
-            version: 3,
+            version: 4,
             settings: Settings::default(),
             bindings: vec![sample_binding()],
             links: vec![sample_link()],
@@ -166,9 +171,9 @@ mod tests {
     }
 
     #[test]
-    fn data_default_is_version_three_with_html_extensions() {
+    fn data_default_is_version_four_with_html_extensions() {
         let data = Data::default();
-        assert_eq!(data.version, 3);
+        assert_eq!(data.version, 4);
         assert_eq!(data.settings.extensions, [".html"]);
         assert!(data.bindings.is_empty());
         assert!(data.links.is_empty());
@@ -198,8 +203,9 @@ mod tests {
         assert!(binding.get("created_at").is_none());
 
         let link = &value["links"][0];
-        assert!(link.get("addedAt").is_some());
-        assert!(link.get("added_at").is_none());
+        assert!(link.get("modifiedAt").is_some());
+        assert!(link.get("addedAt").is_none());
+        assert!(link.get("modified_at").is_none());
 
         let ignored = &value["ignored"][0];
         assert!(ignored.get("bindingId").is_some());
@@ -242,6 +248,22 @@ mod tests {
         link.as_object_mut().unwrap().remove("missing");
         let link: Link = serde_json::from_value(link).unwrap();
         assert!(!link.missing);
+    }
+
+    #[test]
+    fn old_added_at_deserializes_as_modified_at() {
+        let mut value = serde_json::to_value(sample_link()).unwrap();
+        let added = value
+            .as_object_mut()
+            .unwrap()
+            .remove("modifiedAt")
+            .expect("modifiedAt");
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("addedAt".to_string(), added.clone());
+        let link: Link = serde_json::from_value(value).unwrap();
+        assert_eq!(serde_json::to_value(link.modified_at).unwrap(), added);
     }
 
     #[test]

@@ -2,10 +2,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 
 import { scanAll } from "../api/commands";
-import { useStore } from "../store";
 import { errorMessage } from "../utils/error";
 import { BindDialog } from "./BindDialog";
-import { SettingsDialog } from "./SettingsDialog";
 
 interface ToolbarProps {
   onToast: (message: string) => void;
@@ -14,9 +12,6 @@ interface ToolbarProps {
 export function Toolbar({ onToast }: ToolbarProps) {
   const [busy, setBusy] = useState(false);
   const [bindPath, setBindPath] = useState<string | null>(null);
-  const [settingsBindingId, setSettingsBindingId] = useState<string | null>(
-    null,
-  );
 
   async function handleBind() {
     const selected = await open({
@@ -63,33 +58,10 @@ export function Toolbar({ onToast }: ToolbarProps) {
       >
         扫描新文件
       </button>
-      <button
-        type="button"
-        disabled={busy}
-        title="设置当前文件夹的文件类型"
-        aria-label="设置"
-        onClick={() => {
-          const current = useStore.getState().view;
-          if (current.type !== "binding") {
-            onToast("请先选择一个文件夹");
-            return;
-          }
-          setSettingsBindingId(current.id);
-        }}
-      >
-        ⚙
-      </button>
       {bindPath ? (
         <BindDialog
           path={bindPath}
           onClose={() => setBindPath(null)}
-          onToast={onToast}
-        />
-      ) : null}
-      {settingsBindingId ? (
-        <SettingsDialog
-          bindingId={settingsBindingId}
-          onClose={() => setSettingsBindingId(null)}
           onToast={onToast}
         />
       ) : null}

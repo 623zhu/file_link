@@ -158,9 +158,7 @@ button {
 .link-header,
 .link-row {
   display: grid;
-  grid-template-columns:
-    minmax(140px, 1.2fr) minmax(180px, 2fr) minmax(88px, 0.9fr)
-    108px;
+  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 2fr) 108px;
   gap: 8px;
   align-items: center;
   padding: 0 16px;

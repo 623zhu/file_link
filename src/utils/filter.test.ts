@@ -15,7 +15,7 @@ function link(
     key: `d:\\files\\${id}.html`,
     name: extras.name ?? `${id}.html`,
     sources,
-    addedAt: "2026-11-04T15:00:00+08:00",
+    modifiedAt: "2026-11-04T15:00:00+08:00",
     missing,
   };
 }

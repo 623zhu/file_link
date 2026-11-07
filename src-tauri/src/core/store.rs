@@ -83,6 +83,14 @@ fn migrate(mut data: Data) -> Data {
                 }
                 data.version = 3;
             }
+            3 => {
+                for link in &mut data.links {
+                    if let Some(mtime) = super::path::try_file_modified_at(&link.path) {
+                        link.modified_at = mtime;
+                    }
+                }
+                data.version = 4;
+            }
             _ => break,
         }
     }
@@ -117,7 +125,7 @@ mod tests {
 
     fn sample_data() -> Data {
         Data {
-            version: 3,
+            version: 4,
             settings: Default::default(),
             bindings: Vec::new(),
             links: vec![Link {
@@ -126,7 +134,7 @@ mod tests {
                 key: r"d:\tools\json.html".to_string(),
                 name: "json.html".to_string(),
                 sources: vec![Source::Manual],
-                added_at: chrono::Local
+                modified_at: chrono::Local
                     .with_ymd_and_hms(2026, 11, 4, 15, 0, 0)
                     .unwrap(),
                 missing: false,
@@ -209,7 +217,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&data).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 3);
+        assert_eq!(loaded.data.version, 4);
         assert_eq!(loaded.data.settings, Data::default().settings);
     }
 
@@ -235,7 +243,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 3);
+        assert_eq!(loaded.data.version, 4);
         assert_eq!(loaded.data.settings.extensions, [".html"]);
         assert_eq!(loaded.data.bindings[0].extensions, [".md"]);
     }
@@ -275,9 +283,47 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 3);
+        assert_eq!(loaded.data.version, 4);
         assert_eq!(loaded.data.settings.extensions, [".html"]);
         assert_eq!(loaded.data.bindings[0].extensions, [".html"]);
         assert_eq!(loaded.data.bindings[1].extensions, [".md"]);
+    }
+
+    #[test]
+    fn migrate_replaces_added_at_with_file_modified_at() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("page.html");
+        fs::write(&file, "ok").unwrap();
+        let display = super::super::path::normalize(&file).unwrap().0;
+        let stamp = "2020-01-01T00:00:00+08:00";
+        let json = serde_json::json!({
+            "version": 3,
+            "settings": { "extensions": [".html"] },
+            "bindings": [],
+            "links": [{
+                "id": "l1",
+                "path": display,
+                "key": display.to_lowercase(),
+                "name": "page.html",
+                "sources": [{ "type": "manual" }],
+                "addedAt": stamp,
+                "missing": false
+            }],
+            "ignored": []
+        });
+        let path = dir.path().join("data.json");
+        fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+
+        let loaded = load(&path).unwrap();
+        assert_eq!(loaded.data.version, 4);
+        let expected = super::super::path::file_modified_at(&loaded.data.links[0].path);
+        assert_eq!(
+            loaded.data.links[0].modified_at.timestamp(),
+            expected.timestamp()
+        );
+        assert_ne!(
+            loaded.data.links[0].modified_at.to_rfc3339(),
+            "2020-01-01T00:00:00+08:00"
+        );
     }
 }
