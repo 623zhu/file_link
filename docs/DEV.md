@@ -643,9 +643,10 @@ pnpm tauri build
 
 构建完成后：
 
-1. 从 `src-tauri/target/release/` 复制 `file-link.exe`，重命名为 `FileLink_<版本>_x64_portable.exe`。
-2. （M5）从 `src-tauri/target/release/bundle/nsis/` 复制安装程序，重命名为 `FileLink_<版本>_x64-setup.exe`。
-3. 生成校验值，随发布文件一起提供：
+1. 从 `src-tauri/target/release/` 复制 `file-link.exe`，覆盖 `release/FileLink_<版本>_x64_portable.exe`。
+2. 删除 `release/` 中其它 `.exe`（包括临时复制的 `file-link.exe`）。目录里始终只留最新一份免安装版。
+3. （M5）从 `src-tauri/target/release/bundle/nsis/` 复制安装程序，覆盖 `release/FileLink_<版本>_x64-setup.exe`，同样不保留旧安装包。
+4. 生成校验值，更新 `release/SHA256SUMS.txt` 和 `release/NOTES.md`：
 
 ```powershell
 Get-FileHash .\FileLink_0.1.0_x64_portable.exe -Algorithm SHA256
