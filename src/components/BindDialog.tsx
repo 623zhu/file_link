@@ -118,7 +118,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
               onChange={(event) => setExtensionsText(event.target.value)}
               style={inputStyle}
             />
-            <span style={hintStyle}>选择需要绑定的文件类型，例如.html</span>
+            <span style={hintStyle}>选择需要绑定的文件类型，例如.html, .doc</span>
           </label>
           <label style={checkboxStyle}>
             <input
