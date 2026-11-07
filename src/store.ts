@@ -1,7 +1,8 @@
 import { create } from "zustand";
 
 import { getSnapshot } from "./api/commands";
-import type { Binding, Snapshot, View } from "./types";
+import type { Binding, Link, Snapshot, View } from "./types";
+import { listedExtensions } from "./utils/filter";
 
 export type SelectMode = "replace" | "toggle" | "range" | "add-range";
 
@@ -25,7 +26,7 @@ export const useStore = create<Store>((set) => ({
     const snapshot = await getSnapshot();
     set((state) => ({
       snapshot,
-      view: resolveView(state.view, snapshot.bindings),
+      view: resolveView(state.view, snapshot.bindings, snapshot.links),
     }));
   },
 }));
@@ -33,12 +34,23 @@ export const useStore = create<Store>((set) => ({
 export function resolveView(
   view: View,
   bindings: readonly Binding[],
+  links: readonly Link[] = [],
 ): View {
   if (view.type === "binding" && bindings.some((item) => item.id === view.id)) {
     return view;
   }
+  if (
+    view.type === "extension" &&
+    listedExtensions(links).includes(view.ext)
+  ) {
+    return view;
+  }
   const first = bindings[0];
-  return first ? { type: "binding", id: first.id } : { type: "none" };
+  if (first) {
+    return { type: "binding", id: first.id };
+  }
+  const ext = listedExtensions(links)[0];
+  return ext ? { type: "extension", ext } : { type: "none" };
 }
 
 export function selectionModeFromEvent(event: {

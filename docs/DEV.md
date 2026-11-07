@@ -79,7 +79,7 @@ file_link/
 │  ├─ types.ts                  # 与 Rust 模型对应的 TS 类型
 │  ├─ store.ts                  # Zustand store
 │  ├─ components/
-│  │  ├─ Sidebar.tsx            # 绑定文件夹列表
+│  │  ├─ Sidebar.tsx            # 绑定文件夹 / 文件类型
 │  │  ├─ Toolbar.tsx            # 绑定、扫描、设置
 │  │  ├─ LinkList.tsx           # 虚拟列表
 │  │  ├─ LinkRow.tsx
@@ -87,7 +87,7 @@ file_link/
 │  │  ├─ SettingsDialog.tsx     # 文件类型配置
 │  │  └─ Toast.tsx
 │  ├─ utils/
-│  │  └─ filter.ts              # 按绑定过滤与排序
+│  │  └─ filter.ts              # 按绑定或文件类型过滤与排序
 │  └─ styles/
 └─ src-tauri/                   # 后端
    ├─ Cargo.toml
@@ -462,13 +462,13 @@ pub enum AppError {
 ┌──────────────┬──────────────────────────────────────────────┐
 │ ── 文件夹 ── │ [绑定文件夹] [扫描新文件] [⚙]                │
 │  tools  (n)  ├──────────────────────────────────────────────┤
-│  report (n)  │ 名称        路径               来源      加入时间   │
-│              │ json.html   D:\tools\json.html 文件夹    11-04 15:00 │
-│              │ old.html    D:\tools\old.html  文件夹 [缺失]        │
+│ ── 文件类型──│ 名称        路径               来源      加入时间   │
+│  HTML   (n)  │ json.html   D:\tools\json.html 文件夹    11-04 15:00 │
+│  MD     (n)  │ old.html    D:\tools\old.html  文件夹 [缺失]        │
 └──────────────┴──────────────────────────────────────────────┘
 ```
 
-- 侧边栏：各绑定文件夹（显示数量；悬停显示完整路径；右键菜单：扫描、自动导入开关、包含子文件夹开关、在资源管理器中打开、解除绑定）。不提供「全部链接」「手动导入」。
+- 侧边栏分两组：绑定文件夹（右键菜单：扫描、自动导入、包含子文件夹、在资源管理器中打开、解除绑定）；文件类型（按扩展名汇总已绑定链接）。不提供「全部链接」「手动导入」。
 - 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。
 - 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
@@ -479,14 +479,17 @@ pub enum AppError {
 ```ts
 interface UiState {
   snapshot: Snapshot | null;
-  view: { type: "binding"; id: string } | { type: "none" };
+  view:
+    | { type: "binding"; id: string }
+    | { type: "extension"; ext: string }
+    | { type: "none" };
   selectedIds: Set<string>;
 }
 ```
 
 - 列表数据 = `filter(snapshot.links, view)`，放在 `utils/filter.ts`，纯函数，便于单测。
-- 只显示当前选中绑定的链接；无绑定时列表为空。
-- 启动或当前绑定被解除后，选中剩余的第一个绑定；一个都没有则为 `none`。
+- 选中文件夹时只显示该绑定的链接；选中文件类型时显示该扩展名且来自绑定的链接。
+- 启动或当前视图失效后，选中剩余的第一个绑定；没有绑定则选第一个文件类型；都没有则为 `none`。
 - 列表默认排序：缺失的排在后面，其余按名称排序。
 
 ### 9.3 文案原则
@@ -520,7 +523,7 @@ interface UiState {
 
 ### 10.3 前端
 
-`vitest` 测试 `utils/filter.ts`（按绑定过滤、排序）。
+`vitest` 测试 `utils/filter.ts`（按绑定或文件类型过滤、排序）。
 
 ### 10.4 手动验收（对应 PRD 第 9 节）
 

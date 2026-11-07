@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Link, Source } from "../types";
-import { filterLinks } from "./filter";
+import { filterLinks, listedExtensions } from "./filter";
 
 function link(
   id: string,
@@ -30,6 +30,10 @@ const links: Link[] = [
   link("both", [manual, binding]),
   link("missing-binding", [binding], true),
   link("other-binding", [otherBinding]),
+  link("note", [binding], false, {
+    name: "note.md",
+    path: "D:\\files\\note.md",
+  }),
 ];
 
 function ids(result: Link[]): string[] {
@@ -44,6 +48,7 @@ describe("filterLinks", () => {
   it("keeps links that include the selected binding", () => {
     expect(ids(filterLinks(links, { type: "binding", id: "b1" }))).toEqual([
       "both",
+      "note",
       "only-binding",
       "missing-binding",
     ]);
@@ -59,6 +64,27 @@ describe("filterLinks", () => {
     expect(ids(filterLinks(links, { type: "binding", id: "b1" }))).not.toContain(
       "only-manual",
     );
+  });
+
+  it("keeps bound links of the selected file type", () => {
+    expect(ids(filterLinks(links, { type: "extension", ext: ".html" }))).toEqual(
+      ["both", "only-binding", "other-binding", "missing-binding"],
+    );
+    expect(ids(filterLinks(links, { type: "extension", ext: ".md" }))).toEqual([
+      "note",
+    ]);
+  });
+
+  it("hides manual-only links from file type views", () => {
+    expect(
+      ids(filterLinks(links, { type: "extension", ext: ".html" })),
+    ).not.toContain("only-manual");
+  });
+});
+
+describe("listedExtensions", () => {
+  it("lists bound extensions and ignores manual-only links", () => {
+    expect(listedExtensions(links)).toEqual([".html", ".md"]);
   });
 });
 

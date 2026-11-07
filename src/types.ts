@@ -38,7 +38,9 @@ export interface AppError {
 }
 
 export type View =
-  { type: "binding"; id: string } | { type: "none" };
+  | { type: "binding"; id: string }
+  | { type: "extension"; ext: string }
+  | { type: "none" };
 
 export interface ImportResult {
   added: number;

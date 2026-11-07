@@ -5,7 +5,13 @@ import { removeBinding, scanBinding, updateBinding } from "../api/commands";
 import { useStore } from "../store";
 import type { Binding, View } from "../types";
 import { errorMessage } from "../utils/error";
-import { hasBindingSource } from "../utils/filter";
+import {
+  extensionLabel,
+  hasAnyBindingSource,
+  hasBindingSource,
+  linkExtension,
+  listedExtensions,
+} from "../utils/filter";
 import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
 
@@ -26,6 +32,7 @@ export function Sidebar({ onToast }: SidebarProps) {
   const links = useStore((state) => state.snapshot?.links);
   const bindings = useStore((state) => state.snapshot?.bindings) ?? [];
   const view = useStore((state) => state.view);
+  const extensions = listedExtensions(links ?? []);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [unbinding, setUnbinding] = useState<Binding | null>(null);
 
@@ -138,6 +145,24 @@ export function Sidebar({ onToast }: SidebarProps) {
               <p className="sidebar-hint">{NETWORK_WATCH_HINT}</p>
             ) : null}
           </div>
+        ))}
+      </div>
+      <div className="sidebar-group">
+        <div className="sidebar-group-title">文件类型</div>
+        {extensions.map((ext) => (
+          <SidebarItem
+            key={ext}
+            label={extensionLabel(ext)}
+            count={
+              links?.filter(
+                (item) =>
+                  hasAnyBindingSource(item) && linkExtension(item) === ext,
+              ).length ?? 0
+            }
+            active={view.type === "extension" && view.ext === ext}
+            title={ext}
+            onSelect={() => setView({ type: "extension", ext })}
+          />
         ))}
       </div>
       {menu ? (
