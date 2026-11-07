@@ -13,20 +13,7 @@ interface BindDialogProps {
   onToast: (message: string) => void;
 }
 
-function parseExtensions(text: string): string[] {
-  return text
-    .split(",")
-    .map((item) => item.trim())
-    .filter((item) => item.length > 0);
-}
-
 export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
-  const defaultExtensions = useStore(
-    (state) => state.snapshot?.settings.extensions ?? [".html", ".htm"],
-  );
-  const [extensionsText, setExtensionsText] = useState(
-    defaultExtensions.join(", "),
-  );
   const [recursive, setRecursive] = useState(true);
   const [autoWatch, setAutoWatch] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -46,12 +33,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
   }, [busy, largeCount, onClose]);
 
   async function runBind() {
-    const result = await addBinding(
-      path,
-      recursive,
-      autoWatch,
-      parseExtensions(extensionsText),
-    );
+    const result = await addBinding(path, recursive, autoWatch);
     useStore.setState({
       view: { type: "binding", id: result.binding.id },
     });
@@ -62,11 +44,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
   async function handleSubmit() {
     setBusy(true);
     try {
-      const preview = await previewBinding(
-        path,
-        recursive,
-        parseExtensions(extensionsText),
-      );
+      const preview = await previewBinding(path, recursive);
       if (preview.count > LARGE_COUNT) {
         setLargeCount(preview.count);
         return;
@@ -112,19 +90,6 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
           <p className="dialog-message" title={path}>
             {path}
           </p>
-          <label style={fieldStyle}>
-            <span>文件类型</span>
-            <input
-              type="text"
-              value={extensionsText}
-              disabled={busy}
-              aria-label="文件类型"
-              placeholder=".html, .htm"
-              onChange={(event) => setExtensionsText(event.target.value)}
-              style={inputStyle}
-            />
-            <span style={hintStyle}>用逗号分隔，例如 .html, .htm</span>
-          </label>
           <label style={checkboxStyle}>
             <input
               type="checkbox"
@@ -174,23 +139,4 @@ const checkboxStyle: CSSProperties = {
   alignItems: "center",
   gap: 8,
   marginBottom: 10,
-};
-
-const fieldStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 6,
-  marginBottom: 12,
-};
-
-const inputStyle: CSSProperties = {
-  height: 32,
-  padding: "0 8px",
-  border: "1px solid #e5e7eb",
-  borderRadius: 4,
-};
-
-const hintStyle: CSSProperties = {
-  color: "#6b7280",
-  fontSize: 12,
 };

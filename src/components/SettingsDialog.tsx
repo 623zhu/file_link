@@ -1,26 +1,18 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
-import { updateBinding } from "../api/commands";
+import { updateSettings } from "../api/commands";
 import { useStore } from "../store";
 import { errorMessage } from "../utils/error";
 
 interface SettingsDialogProps {
-  bindingId: string;
   onClose: () => void;
   onToast: (message: string) => void;
 }
 
-export function SettingsDialog({
-  bindingId,
-  onClose,
-  onToast,
-}: SettingsDialogProps) {
-  const extensions = useStore((state) => {
-    const binding = state.snapshot?.bindings.find(
-      (item) => item.id === bindingId,
-    );
-    return binding?.extensions ?? [".html", ".htm"];
-  });
+export function SettingsDialog({ onClose, onToast }: SettingsDialogProps) {
+  const extensions = useStore(
+    (state) => state.snapshot?.settings.extensions ?? [".html", ".htm"],
+  );
   const [text, setText] = useState(extensions.join(", "));
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +33,7 @@ export function SettingsDialog({
       .filter((item) => item.length > 0);
     setBusy(true);
     try {
-      await updateBinding(bindingId, { extensions: items });
+      await updateSettings(items);
       onToast("新规则将在之后的扫描中生效");
       onClose();
     } catch (err) {

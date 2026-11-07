@@ -14,7 +14,7 @@ pub struct Data {
 impl Default for Data {
     fn default() -> Self {
         Self {
-            version: 2,
+            version: 1,
             settings: Settings::default(),
             bindings: Vec::new(),
             links: Vec::new(),
@@ -29,16 +29,10 @@ pub struct Settings {
     pub extensions: Vec<String>,
 }
 
-impl Settings {
-    pub fn html_extensions() -> Vec<String> {
-        vec![".html".to_string(), ".htm".to_string()]
-    }
-}
-
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            extensions: Self::html_extensions(),
+            extensions: vec![".html".to_string(), ".htm".to_string()],
         }
     }
 }
@@ -51,8 +45,6 @@ pub struct Binding {
     pub key: String,
     pub recursive: bool,
     pub auto_watch: bool,
-    #[serde(default)]
-    pub extensions: Vec<String>,
     pub rule_id: Option<String>,
     pub created_at: DateTime<Local>,
     #[serde(default)]
@@ -125,7 +117,6 @@ mod tests {
             key: r"d:\tools".to_string(),
             recursive: true,
             auto_watch: true,
-            extensions: Settings::html_extensions(),
             rule_id: None,
             created_at: sample_time(),
             unavailable: false,
@@ -146,7 +137,7 @@ mod tests {
 
     fn sample_data() -> Data {
         Data {
-            version: 2,
+            version: 1,
             settings: Settings::default(),
             bindings: vec![sample_binding()],
             links: vec![sample_link()],
@@ -166,9 +157,9 @@ mod tests {
     }
 
     #[test]
-    fn data_default_is_version_two_with_html_extensions() {
+    fn data_default_is_version_one_with_html_extensions() {
         let data = Data::default();
-        assert_eq!(data.version, 2);
+        assert_eq!(data.version, 1);
         assert_eq!(data.settings.extensions, [".html", ".htm"]);
         assert!(data.bindings.is_empty());
         assert!(data.links.is_empty());
@@ -186,7 +177,6 @@ mod tests {
         let binding = &value["bindings"][0];
         for key in [
             "autoWatch",
-            "extensions",
             "ruleId",
             "createdAt",
             "unavailable",
@@ -233,10 +223,8 @@ mod tests {
     fn missing_and_unavailable_default_when_absent() {
         let mut binding = serde_json::to_value(sample_binding()).unwrap();
         binding.as_object_mut().unwrap().remove("unavailable");
-        binding.as_object_mut().unwrap().remove("extensions");
         let binding: Binding = serde_json::from_value(binding).unwrap();
         assert!(!binding.unavailable);
-        assert!(binding.extensions.is_empty());
 
         let mut link = serde_json::to_value(sample_link()).unwrap();
         link.as_object_mut().unwrap().remove("missing");

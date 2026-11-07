@@ -17,7 +17,6 @@ export interface Binding {
   key: string;
   recursive: boolean;
   autoWatch: boolean;
-  extensions: string[];
   ruleId: string | null;
   createdAt: string;
   unavailable: boolean;

@@ -23,27 +23,21 @@ export function importFiles(paths: string[]): Promise<ImportResult> {
 export function previewBinding(
   path: string,
   recursive: boolean,
-  extensions: string[],
 ): Promise<PreviewBindingResult> {
-  return invoke("preview_binding", { path, recursive, extensions });
+  return invoke("preview_binding", { path, recursive });
 }
 
 export function addBinding(
   path: string,
   recursive: boolean,
   autoWatch: boolean,
-  extensions: string[],
 ): Promise<AddBindingResult> {
-  return invoke("add_binding", { path, recursive, autoWatch, extensions });
+  return invoke("add_binding", { path, recursive, autoWatch });
 }
 
 export function updateBinding(
   id: string,
-  changes: {
-    recursive?: boolean;
-    autoWatch?: boolean;
-    extensions?: string[];
-  } = {},
+  changes: { recursive?: boolean; autoWatch?: boolean } = {},
 ): Promise<Binding> {
   return invoke("update_binding", { id, ...changes });
 }

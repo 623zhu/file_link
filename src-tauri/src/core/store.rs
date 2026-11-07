@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::Local;
 
-use super::model::{Data, Settings};
+use super::model::Data;
 
 pub struct LoadResult {
     pub data: Data,
@@ -60,20 +60,8 @@ pub fn save(path: impl AsRef<Path>, data: &Data) -> io::Result<()> {
 fn migrate(mut data: Data) -> Data {
     loop {
         match data.version {
+            1 => break,
             0 => data.version = 1,
-            1 => {
-                let fallback = if data.settings.extensions.is_empty() {
-                    Settings::html_extensions()
-                } else {
-                    data.settings.extensions.clone()
-                };
-                for binding in &mut data.bindings {
-                    if binding.extensions.is_empty() {
-                        binding.extensions = fallback.clone();
-                    }
-                }
-                data.version = 2;
-            }
             _ => break,
         }
     }
@@ -108,7 +96,7 @@ mod tests {
 
     fn sample_data() -> Data {
         Data {
-            version: 2,
+            version: 1,
             settings: Default::default(),
             bindings: Vec::new(),
             links: vec![Link {
@@ -192,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn migrate_steps_version_zero_to_current() {
+    fn migrate_steps_version_zero_to_one() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("data.json");
         let mut data = Data::default();
@@ -200,33 +188,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&data).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 2);
+        assert_eq!(loaded.data.version, 1);
         assert_eq!(loaded.data.settings, Data::default().settings);
-    }
-
-    #[test]
-    fn migrate_copies_global_extensions_onto_bindings() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("data.json");
-        let json = serde_json::json!({
-            "version": 1,
-            "settings": { "extensions": [".md"] },
-            "bindings": [{
-                "id": "b1",
-                "path": r"D:\notes",
-                "key": r"d:\notes",
-                "recursive": true,
-                "autoWatch": true,
-                "ruleId": null,
-                "createdAt": "2026-11-04T15:00:00+08:00",
-            }],
-            "links": [],
-            "ignored": []
-        });
-        fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
-
-        let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 2);
-        assert_eq!(loaded.data.bindings[0].extensions, [".md"]);
     }
 }

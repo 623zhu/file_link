@@ -19,7 +19,6 @@ import {
 } from "../utils/filter";
 import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { SettingsDialog } from "./SettingsDialog";
 
 interface SidebarProps {
   onToast: (message: string) => void;
@@ -49,7 +48,6 @@ export function Sidebar({ onToast }: SidebarProps) {
   );
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [unbinding, setUnbinding] = useState<Binding | null>(null);
-  const [editingTypes, setEditingTypes] = useState<string | null>(null);
 
   useEffect(() => {
     if (!menu) {
@@ -258,16 +256,6 @@ export function Sidebar({ onToast }: SidebarProps) {
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              setEditingTypes(menu.binding.id);
-              setMenu(null);
-            }}
-          >
-            文件类型
-          </button>
-          <button
-            type="button"
-            role="menuitem"
             onClick={() => void handleOpenFolder(menu.binding)}
           >
             在资源管理器中打开
@@ -291,13 +279,6 @@ export function Sidebar({ onToast }: SidebarProps) {
         onConfirm={() => void handleUnbind()}
         onCancel={() => setUnbinding(null)}
       />
-      {editingTypes ? (
-        <SettingsDialog
-          bindingId={editingTypes}
-          onClose={() => setEditingTypes(null)}
-          onToast={onToast}
-        />
-      ) : null}
     </nav>
   );
 }

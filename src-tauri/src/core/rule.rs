@@ -16,13 +16,10 @@ pub struct Rule {
     pub extensions: Vec<String>,
 }
 
-pub fn effective_rule(binding: &Binding, settings: &Settings) -> Rule {
-    let extensions = if binding.extensions.is_empty() {
-        settings.extensions.clone()
-    } else {
-        binding.extensions.clone()
-    };
-    Rule { extensions }
+pub fn effective_rule(_binding: &Binding, settings: &Settings) -> Rule {
+    Rule {
+        extensions: settings.extensions.clone(),
+    }
 }
 
 pub fn matches(path: impl AsRef<Path>, extensions: &[String]) -> bool {
@@ -75,7 +72,6 @@ mod tests {
             key: r"d:\html".to_string(),
             recursive: false,
             auto_watch: false,
-            extensions: Vec::new(),
             rule_id: Some("custom".to_string()),
             created_at: chrono::Local
                 .with_ymd_and_hms(2026, 11, 4, 15, 0, 0)
@@ -93,20 +89,6 @@ mod tests {
         let rule = default_rule();
         assert!(matches("page.HTML", &rule.extensions));
         assert!(matches("page.Htm", &rule.extensions));
-    }
-
-    #[test]
-    fn binding_extensions_override_settings() {
-        let mut binding = dummy_binding();
-        binding.extensions = vec![".md".to_string()];
-        let rule = effective_rule(
-            &binding,
-            &Settings {
-                extensions: vec![".html".to_string()],
-            },
-        );
-        assert!(matches("note.md", &rule.extensions));
-        assert!(!matches("page.html", &rule.extensions));
     }
 
     #[test]

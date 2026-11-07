@@ -70,9 +70,8 @@ pub fn preview_binding(
     state: State<AppState>,
     path: String,
     recursive: bool,
-    extensions: Vec<String>,
 ) -> Result<PreviewBindingResult, AppError> {
-    service::preview_binding(&state, &path, recursive, &extensions)
+    service::preview_binding(&state, &path, recursive)
 }
 
 #[tauri::command(rename_all = "camelCase")]
@@ -82,9 +81,8 @@ pub fn add_binding(
     path: String,
     recursive: bool,
     auto_watch: bool,
-    extensions: Vec<String>,
 ) -> Result<AddBindingResult, AppError> {
-    let result = service::add_binding(&state, &path, recursive, auto_watch, &extensions)?;
+    let result = service::add_binding(&state, &path, recursive, auto_watch)?;
     emit_state_changed(&app)?;
     Ok(result)
 }
@@ -96,10 +94,8 @@ pub fn update_binding(
     id: String,
     recursive: Option<bool>,
     auto_watch: Option<bool>,
-    extensions: Option<Vec<String>>,
 ) -> Result<Binding, AppError> {
-    let result =
-        service::update_binding(&state, &id, recursive, auto_watch, extensions.as_deref())?;
+    let result = service::update_binding(&state, &id, recursive, auto_watch)?;
     if result.unavailable {
         service::emit_binding_unavailable(&app, &result.id);
     }
