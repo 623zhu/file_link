@@ -234,7 +234,7 @@ pub fn mark_missing(data: &mut Data, id: &str) -> Result<(), AppError> {
     Ok(())
 }
 
-pub fn update_settings(data: &mut Data, extensions: &[String]) -> Result<Settings, AppError> {
+pub fn normalize_extensions(extensions: &[String]) -> Result<Vec<String>, AppError> {
     let mut normalized = Vec::new();
     let mut seen = HashSet::new();
     for raw in extensions {
@@ -253,7 +253,11 @@ pub fn update_settings(data: &mut Data, extensions: &[String]) -> Result<Setting
     if normalized.is_empty() {
         return Err(AppError::EmptyExtensions);
     }
-    data.settings.extensions = normalized;
+    Ok(normalized)
+}
+
+pub fn update_settings(data: &mut Data, extensions: &[String]) -> Result<Settings, AppError> {
+    data.settings.extensions = normalize_extensions(extensions)?;
     Ok(data.settings.clone())
 }
 
@@ -292,10 +296,12 @@ pub fn preview_binding(
     state: &AppState,
     raw_path: &str,
     recursive: bool,
+    extensions: &[String],
 ) -> Result<PreviewBindingResult, AppError> {
+    let extensions = normalize_extensions(extensions)?;
     let (display, key) = normalize_dir(raw_path)?;
     let settings = lock(&state.data)?.settings.clone();
-    let binding = new_binding(display.clone(), key, recursive, false);
+    let binding = new_binding(display, key, recursive, false, extensions);
     let files = scan_files(&binding, &settings)?;
     Ok(PreviewBindingResult { count: files.len() })
 }
@@ -305,7 +311,9 @@ pub fn add_binding(
     raw_path: &str,
     recursive: bool,
     auto_watch: bool,
+    extensions: &[String],
 ) -> Result<AddBindingResult, AppError> {
+    let extensions = normalize_extensions(extensions)?;
     let (display, key) = normalize_dir(raw_path)?;
     let settings = {
         let data = lock(&state.data)?;
@@ -314,7 +322,7 @@ pub fn add_binding(
         }
         data.settings.clone()
     };
-    let binding = new_binding(display, key, recursive, auto_watch);
+    let binding = new_binding(display, key, recursive, auto_watch, extensions);
     let files = scan_files(&binding, &settings)?;
     let result = write(state, |data| {
         if data
@@ -341,7 +349,12 @@ pub fn update_binding(
     id: &str,
     recursive: Option<bool>,
     auto_watch: Option<bool>,
+    extensions: Option<&[String]>,
 ) -> Result<Binding, AppError> {
+    let extensions = match extensions {
+        Some(raw) => Some(normalize_extensions(raw)?),
+        None => None,
+    };
     let (mut binding, settings) = {
         let data = lock(&state.data)?;
         (find_binding(&data, id)?.clone(), data.settings.clone())
@@ -352,7 +365,10 @@ pub fn update_binding(
     if let Some(auto_watch) = auto_watch {
         binding.auto_watch = auto_watch;
     }
-    let files = if recursive.is_some() {
+    if let Some(extensions) = &extensions {
+        binding.extensions.clone_from(extensions);
+    }
+    let files = if recursive.is_some() || extensions.is_some() {
         Some(scan_files(&binding, &settings))
     } else {
         None
@@ -367,6 +383,7 @@ pub fn update_binding(
                 .ok_or(AppError::NotFound)?;
             current.recursive = binding.recursive;
             current.auto_watch = binding.auto_watch;
+            current.extensions.clone_from(&binding.extensions);
             match &files {
                 Some(Ok(_)) => current.unavailable = false,
                 Some(Err(_)) => current.unavailable = true,
@@ -529,13 +546,20 @@ fn normalize_dir(raw: &str) -> Result<(String, String), AppError> {
     Ok((display, key))
 }
 
-fn new_binding(display: String, key: String, recursive: bool, auto_watch: bool) -> Binding {
+fn new_binding(
+    display: String,
+    key: String,
+    recursive: bool,
+    auto_watch: bool,
+    extensions: Vec<String>,
+) -> Binding {
     Binding {
         id: Uuid::new_v4().to_string(),
         path: display,
         key,
         recursive,
         auto_watch,
+        extensions,
         rule_id: None,
         created_at: Local::now(),
         unavailable: false,
@@ -724,6 +748,19 @@ mod tests {
         let file = dir.join(name);
         fs::write(&file, "<html></html>").unwrap();
         file.to_string_lossy().into_owned()
+    }
+
+    fn html_exts() -> Vec<String> {
+        Settings::html_extensions()
+    }
+
+    fn add_html(
+        state: &AppState,
+        path: impl AsRef<str>,
+        recursive: bool,
+        auto_watch: bool,
+    ) -> AddBindingResult {
+        add_binding(state, path.as_ref(), recursive, auto_watch, &html_exts()).unwrap()
     }
 
     #[test]
@@ -979,8 +1016,8 @@ mod tests {
         let (_data_dir, state) = temp_state(Data::default());
         let path = dir.path().to_string_lossy().into_owned();
 
-        add_binding(&state, &path, false, false).unwrap();
-        let err = add_binding(&state, &path, true, true).unwrap_err();
+        add_html(&state, &path, false, false);
+        let err = add_binding(&state, &path, true, true, &html_exts()).unwrap_err();
 
         assert!(matches!(err, AppError::BindingExists));
         assert_eq!(snapshot(&state).unwrap().bindings.len(), 1);
@@ -996,11 +1033,11 @@ mod tests {
         let (_data_dir, state) = temp_state(Data::default());
         let path = dir.path().to_string_lossy().into_owned();
 
-        let added = add_binding(&state, &path, false, false).unwrap();
+        let added = add_html(&state, &path, false, false);
         assert_eq!(added.added, 1);
         assert_eq!(snapshot(&state).unwrap().links.len(), 1);
 
-        let updated = update_binding(&state, &added.binding.id, Some(true), None).unwrap();
+        let updated = update_binding(&state, &added.binding.id, Some(true), None, None).unwrap();
         assert!(updated.recursive);
         let names: Vec<_> = snapshot(&state)
             .unwrap()
@@ -1014,6 +1051,53 @@ mod tests {
     }
 
     #[test]
+    fn bindings_can_use_different_extensions() {
+        let html_dir = tempfile::tempdir().unwrap();
+        write_html(html_dir.path(), "a.html");
+        fs::write(html_dir.path().join("a.md"), "# a").unwrap();
+        let md_dir = tempfile::tempdir().unwrap();
+        write_html(md_dir.path(), "b.html");
+        fs::write(md_dir.path().join("b.md"), "# b").unwrap();
+        let (_data_dir, state) = temp_state(Data::default());
+
+        let html = add_html(&state, html_dir.path().to_string_lossy(), false, false);
+        let md = add_binding(
+            &state,
+            &md_dir.path().to_string_lossy(),
+            false,
+            false,
+            &[".md".to_string()],
+        )
+        .unwrap();
+
+        let snap = snapshot(&state).unwrap();
+        assert_eq!(html.binding.extensions, [".html", ".htm"]);
+        assert_eq!(md.binding.extensions, [".md"]);
+        let names: Vec<_> = snap.links.iter().map(|link| link.name.clone()).collect();
+        assert!(names.contains(&"a.html".to_string()));
+        assert!(names.contains(&"b.md".to_string()));
+        assert!(!names.contains(&"a.md".to_string()));
+        assert!(!names.contains(&"b.html".to_string()));
+
+        update_binding(
+            &state,
+            &html.binding.id,
+            None,
+            None,
+            Some(&[".md".to_string()][..]),
+        )
+        .unwrap();
+        let names: Vec<_> = snapshot(&state)
+            .unwrap()
+            .links
+            .iter()
+            .map(|link| link.name.clone())
+            .collect();
+        assert!(names.contains(&"a.html".to_string()));
+        assert!(names.contains(&"a.md".to_string()));
+    }
+
+    #[test]
     fn scan_all_continues_when_one_binding_is_unavailable() {
         let ok_dir = tempfile::tempdir().unwrap();
         write_html(ok_dir.path(), "ok.html");
@@ -1021,8 +1105,8 @@ mod tests {
         write_html(gone_dir.path(), "gone.html");
         let (_data_dir, state) = temp_state(Data::default());
 
-        let ok = add_binding(&state, &ok_dir.path().to_string_lossy(), false, false).unwrap();
-        let gone = add_binding(&state, &gone_dir.path().to_string_lossy(), false, false).unwrap();
+        let ok = add_html(&state, ok_dir.path().to_string_lossy(), false, false);
+        let gone = add_html(&state, gone_dir.path().to_string_lossy(), false, false);
         drop(gone_dir);
 
         let summary = scan_all(&state).unwrap();
@@ -1099,6 +1183,7 @@ mod tests {
             key,
             recursive: false,
             auto_watch,
+            extensions: Settings::html_extensions(),
             rule_id: None,
             created_at: Local::now(),
             unavailable: false,
@@ -1215,7 +1300,7 @@ mod tests {
         fs::create_dir(&bound).unwrap();
         write_html(&bound, "a.html");
         let (_data_dir, state) = temp_state(Data::default());
-        let added = add_binding(&state, &bound.to_string_lossy(), false, true).unwrap();
+        let added = add_html(&state, bound.to_string_lossy(), false, true);
         let id = added.binding.id.clone();
         assert!(state.watcher.is_watching(&id));
 
@@ -1253,7 +1338,7 @@ mod tests {
         fs::create_dir(&bound).unwrap();
         write_html(&bound, "a.html");
         let (_data_dir, state) = temp_state(Data::default());
-        let added = add_binding(&state, &bound.to_string_lossy(), false, true).unwrap();
+        let added = add_html(&state, bound.to_string_lossy(), false, true);
         let id = added.binding.id.clone();
         assert!(state.watcher.is_watching(&id));
 
@@ -1274,7 +1359,7 @@ mod tests {
     fn manual_scan_imports_file_without_stability_check() {
         let dir = tempfile::tempdir().unwrap();
         let (_data_dir, state) = temp_state(Data::default());
-        let added = add_binding(&state, &dir.path().to_string_lossy(), false, false).unwrap();
+        let added = add_html(&state, dir.path().to_string_lossy(), false, false);
         let path = dir.path().join("growing.html");
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let writer = {
