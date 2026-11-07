@@ -1,9 +1,9 @@
 # File Link 开发文档
 
-**对应 PRD：** `docs/PRD.md` v0.2  
-**文档版本：** 0.2  
+**对应 PRD：** `docs/PRD.md` v0.3  
+**文档版本：** 0.3  
 **状态：** 草案  
-**日期：** 2026-11-05
+**日期：** 2026-11-07
 
 ---
 
@@ -157,8 +157,8 @@ flowchart LR
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
-    pub version: u32,                 // 当前为 1
-    pub settings: Settings,
+    pub version: u32,                 // 当前为 2
+    pub settings: Settings,           // 新绑定的默认文件类型
     pub bindings: Vec<Binding>,
     pub links: Vec<Link>,
     pub ignored: Vec<Ignore>,
@@ -167,7 +167,7 @@ pub struct Data {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    pub extensions: Vec<String>,      // 小写、带点，默认 [".html", ".htm"]
+    pub extensions: Vec<String>,      // 新绑定默认值，小写、带点，默认 [".html", ".htm"]
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -178,7 +178,8 @@ pub struct Binding {
     pub key: String,                  // 规范化 key，用于去重
     pub recursive: bool,
     pub auto_watch: bool,
-    pub rule_id: Option<String>,      // 预留：None 表示使用全局规则
+    pub extensions: Vec<String>,      // 该绑定的文件类型
+    pub rule_id: Option<String>,      // 预留
     pub created_at: DateTime<Local>,
     #[serde(default)]
     pub unavailable: bool,            // 目录本身不存在或无权限
@@ -235,7 +236,7 @@ pub struct Ignore {
 - `load(path) -> Result<LoadResult>`：文件不存在返回默认数据；JSON 损坏时把原文件重命名为 `data.json.broken-<时间戳>`，返回默认数据和备份路径。
 - `save(path, data)`：必要时创建目录；先写 `data.json.tmp`，`flush` + `sync_all` 后 `rename` 覆盖 `data.json`。
 - 每次数据变更后立即保存（数据量小，不做延迟批量写入）。
-- `migrate(data)`：按 `version` 逐级迁移；当前版本为 1。
+- `migrate(data)`：按 `version` 逐级迁移；当前版本为 2。版本 1 → 2：每个绑定若没有 `extensions`，则复制当时的全局 `settings.extensions`。
 - 读取失败后以空数据启动，并在界面提示用户。
 
 ### 5.5 TS 类型
@@ -261,6 +262,7 @@ export interface Binding {
   key: string;
   recursive: boolean;
   autoWatch: boolean;
+  extensions: string[];
   ruleId: string | null;
   createdAt: string;
   unavailable: boolean;
@@ -301,7 +303,7 @@ export interface AppError {
 - `matches(path, extensions) -> bool`：扩展名不区分大小写比较。
 - 内置跳过的目录（递归扫描时不进入）：`node_modules`、`.git`、`$RECYCLE.BIN`、`System Volume Information`。
 - 临时文件判断（不导入）：文件名以 `~$` 开头，或扩展名为 `.tmp`、`.crdownload`、`.part`。
-- 规则接口按「绑定 → 生效规则」设计：`effective_rule(binding, settings)`。首期始终返回全局规则，后续支持每个绑定独立规则时只改这一处。
+- 规则接口按「绑定 → 生效规则」设计：`effective_rule(binding, settings)`。使用该绑定的 `extensions`；若为空则回退到 `settings.extensions`。
 
 ### 6.3 `core/scanner.rs`：扫描
 
@@ -373,16 +375,16 @@ for link in 含该绑定来源的 links:
 | --- | --- | --- | --- |
 | `get_snapshot` | — | `Snapshot` | 获取全部数据 |
 | `import_files` | `paths: string[]` | `{ added, skipped }` | 后端保留以兼容旧数据；界面不再调用 |
-| `preview_binding` | `path, recursive` | `{ count }` | 绑定前预扫描，返回命中数量 |
-| `add_binding` | `path, recursive, autoWatch` | `{ binding, added }` | 绑定并首次扫描；同一目录已绑定时报错 |
-| `update_binding` | `id, recursive?, autoWatch?` | `Binding` | 修改后重建监视；改 `recursive` 后立即对账 |
+| `preview_binding` | `path, recursive, extensions` | `{ count }` | 绑定前按该组文件类型预扫描，返回命中数量 |
+| `add_binding` | `path, recursive, autoWatch, extensions` | `{ binding, added }` | 绑定并按该绑定的类型首次扫描；同一目录已绑定时报错 |
+| `update_binding` | `id, recursive?, autoWatch?, extensions?` | `Binding` | 修改后重建监视；改 `recursive` 或 `extensions` 后立即对账 |
 | `remove_binding` | `id` | `{ removedLinks }` | 解除绑定，规则见 5.2、5.3 |
 | `scan_binding` | `id` | `ReconcileSummary` | 扫描单个绑定 |
 | `scan_all` | — | `ReconcileSummary` | 扫描全部绑定 + 全量状态检查 |
 | `remove_links` | `ids: string[]` | `{ removed }` | 只删 link，按 5.3 写忽略名单 |
 | `open_link` | `id` | — | 见 6.6 |
 | `reveal_link` | `id` | — | 见 6.6 |
-| `update_settings` | `extensions: string[]` | `Settings` | 去空格、转小写、补前导点、去重；规范化后为空则报错 |
+| `update_settings` | `extensions: string[]` | `Settings` | 更新新绑定的默认文件类型；去空格、转小写、补前导点、去重；规范化后为空则报错 |
 
 ### 7.2 Events（后端 → 前端）
 
@@ -437,7 +439,7 @@ pub enum AppError {
 
 ### 8.3 绑定文件夹
 
-前端打开文件夹选择框 → 弹出绑定选项（是否包含子文件夹、是否自动导入）→ `preview_binding` → 命中数超过 500 时二次确认 → `add_binding` → 首次对账 → 按需启动监视 → `state-changed`。
+前端打开文件夹选择框 → 弹出绑定选项（文件类型、是否包含子文件夹、是否自动导入）→ `preview_binding` → 命中数超过 500 时二次确认 → `add_binding` → 首次对账 → 按需启动监视 → `state-changed`。
 
 ### 8.4 新文件进入绑定目录
 
@@ -467,11 +469,11 @@ pub enum AppError {
 └──────────────┴──────────────────────────────────────────────┘
 ```
 
-- 侧边栏顶部是「文件夹 / 类型」分段切换，同一时间只显示一组。文件夹是绑定目录（右键菜单：扫描、自动导入、包含子文件夹、在资源管理器中打开、解除绑定）；类型按扩展名汇总已绑定链接。不提供「全部链接」「手动导入」。
-- 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。
+- 侧边栏顶部是「文件夹 / 类型」分段切换，同一时间只显示一组。文件夹是绑定目录（右键菜单：扫描、自动导入、包含子文件夹、文件类型、在资源管理器中打开、解除绑定）；类型按扩展名汇总已绑定链接。不提供「全部链接」「手动导入」。
+- 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。设置编辑当前选中绑定的文件类型；未选中文件夹时提示先选择。
 - 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
-- 设置对话框：编辑扩展名列表（逗号分隔），保存时提示「新规则将在之后的扫描中生效」。
+- 绑定对话框含文件类型（逗号分隔，默认取 `settings.extensions`）。设置对话框编辑当前绑定的扩展名，保存时提示「新规则将在之后的扫描中生效」。
 
 ### 9.2 状态
 
