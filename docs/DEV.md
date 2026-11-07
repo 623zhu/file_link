@@ -167,7 +167,7 @@ pub struct Data {
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Settings {
-    pub extensions: Vec<String>,      // 新绑定默认值，小写、带点，默认 [".html", ".htm"]
+    pub extensions: Vec<String>,      // 新绑定默认值，小写、带点，默认 [".html"]
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -473,7 +473,7 @@ pub enum AppError {
 - 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。设置编辑当前选中绑定的文件类型；未选中文件夹时提示先选择。
 - 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
-- 绑定对话框含文件类型（逗号分隔，默认取 `settings.extensions`）。设置对话框编辑当前绑定的扩展名，保存时提示「新规则将在之后的扫描中生效」。
+- 绑定对话框含文件类型，提示「选择需要绑定的文件类型，例如.html」，默认 `.html`。设置对话框编辑当前绑定的扩展名，保存时提示「新规则将在之后的扫描中生效」。
 
 ### 9.2 状态
 
