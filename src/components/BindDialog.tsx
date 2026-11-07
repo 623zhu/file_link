@@ -21,7 +21,7 @@ function parseExtensions(text: string): string[] {
 }
 
 export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
-  const [extensionsText, setExtensionsText] = useState(".html");
+  const [extensionsText, setExtensionsText] = useState(".html, .doc");
   const [recursive, setRecursive] = useState(true);
   const [autoWatch, setAutoWatch] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -114,7 +114,7 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
               value={extensionsText}
               disabled={busy}
               aria-label="文件类型"
-              placeholder=".html"
+              placeholder=".html, .doc"
               onChange={(event) => setExtensionsText(event.target.value)}
               style={inputStyle}
             />
