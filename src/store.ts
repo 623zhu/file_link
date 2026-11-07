@@ -31,6 +31,34 @@ export const useStore = create<Store>((set) => ({
   },
 }));
 
+export type BrowseTab = "folder" | "type";
+
+export function browseTabFromView(view: View): BrowseTab {
+  return view.type === "extension" ? "type" : "folder";
+}
+
+export function viewForBrowseTab(
+  tab: BrowseTab,
+  bindings: readonly Pick<Binding, "id">[],
+  extensions: readonly string[],
+  preferredBindingId?: string,
+  preferredExt?: string,
+): View {
+  if (tab === "folder") {
+    const id =
+      preferredBindingId &&
+      bindings.some((item) => item.id === preferredBindingId)
+        ? preferredBindingId
+        : bindings[0]?.id;
+    return id ? { type: "binding", id } : { type: "none" };
+  }
+  const ext =
+    preferredExt && extensions.includes(preferredExt)
+      ? preferredExt
+      : extensions[0];
+  return ext ? { type: "extension", ext } : { type: "none" };
+}
+
 export function resolveView(
   view: View,
   bindings: readonly Binding[],

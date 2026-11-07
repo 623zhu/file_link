@@ -2,7 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState, type MouseEvent } from "react";
 
 import { removeBinding, scanBinding, updateBinding } from "../api/commands";
-import { useStore } from "../store";
+import {
+  browseTabFromView,
+  useStore,
+  viewForBrowseTab,
+  type BrowseTab,
+} from "../store";
 import type { Binding, View } from "../types";
 import { errorMessage } from "../utils/error";
 import {
@@ -33,6 +38,14 @@ export function Sidebar({ onToast }: SidebarProps) {
   const bindings = useStore((state) => state.snapshot?.bindings) ?? [];
   const view = useStore((state) => state.view);
   const extensions = listedExtensions(links ?? []);
+  const [emptyTab, setEmptyTab] = useState<BrowseTab>("folder");
+  const tab = view.type === "none" ? emptyTab : browseTabFromView(view);
+  const [lastBindingId, setLastBindingId] = useState(
+    view.type === "binding" ? view.id : undefined,
+  );
+  const [lastExt, setLastExt] = useState(
+    view.type === "extension" ? view.ext : undefined,
+  );
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [unbinding, setUnbinding] = useState<Binding | null>(null);
 
@@ -99,6 +112,37 @@ export function Sidebar({ onToast }: SidebarProps) {
     }
   }
 
+  function selectTab(next: BrowseTab) {
+    if (next === tab) {
+      return;
+    }
+    const nextView = viewForBrowseTab(
+      next,
+      bindings,
+      extensions,
+      lastBindingId,
+      lastExt,
+    );
+    if (nextView.type === "none") {
+      setEmptyTab(next);
+    } else if (nextView.type === "binding") {
+      setLastBindingId(nextView.id);
+    } else {
+      setLastExt(nextView.ext);
+    }
+    setView(nextView);
+  }
+
+  function selectBinding(id: string) {
+    setLastBindingId(id);
+    setView({ type: "binding", id });
+  }
+
+  function selectExtension(ext: string) {
+    setLastExt(ext);
+    setView({ type: "extension", ext });
+  }
+
   async function handleUnbind() {
     if (!unbinding) {
       return;
@@ -114,56 +158,73 @@ export function Sidebar({ onToast }: SidebarProps) {
 
   return (
     <nav className="sidebar" aria-label="链接来源">
-      <div className="sidebar-group">
-        <div className="sidebar-group-title">文件夹</div>
-        {bindings.map((binding) => (
-          <div key={binding.id}>
-            <SidebarItem
-              label={folderName(binding.path)}
-              count={
-                links?.filter((link) => hasBindingSource(link, binding.id))
-                  .length ?? 0
-              }
-              active={view.type === "binding" && view.id === binding.id}
-              unavailable={binding.unavailable}
-              title={binding.path}
-              onSelect={() => setView({ type: "binding", id: binding.id })}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setView({ type: "binding", id: binding.id });
-                setMenu({
-                  binding,
-                  x: Math.min(event.clientX, window.innerWidth - 220),
-                  y: Math.min(event.clientY, window.innerHeight - 220),
-                });
-              }}
-            />
-            {binding.autoWatch &&
-            isNetworkPath(binding.path) &&
-            !binding.unavailable ? (
-              <p className="sidebar-hint">{NETWORK_WATCH_HINT}</p>
-            ) : null}
-          </div>
-        ))}
+      <div className="sidebar-tabs" role="tablist" aria-label="浏览方式">
+        <button
+          type="button"
+          className={tab === "folder" ? "sidebar-tab active" : "sidebar-tab"}
+          role="tab"
+          aria-selected={tab === "folder"}
+          onClick={() => selectTab("folder")}
+        >
+          文件夹
+        </button>
+        <button
+          type="button"
+          className={tab === "type" ? "sidebar-tab active" : "sidebar-tab"}
+          role="tab"
+          aria-selected={tab === "type"}
+          onClick={() => selectTab("type")}
+        >
+          类型
+        </button>
       </div>
-      <div className="sidebar-group">
-        <div className="sidebar-group-title">文件类型</div>
-        {extensions.map((ext) => (
-          <SidebarItem
-            key={ext}
-            label={extensionLabel(ext)}
-            count={
-              links?.filter(
-                (item) =>
-                  hasAnyBindingSource(item) && linkExtension(item) === ext,
-              ).length ?? 0
-            }
-            active={view.type === "extension" && view.ext === ext}
-            title={ext}
-            onSelect={() => setView({ type: "extension", ext })}
-          />
-        ))}
+      <div className="sidebar-group" role="tabpanel">
+        {tab === "folder"
+          ? bindings.map((binding) => (
+              <div key={binding.id}>
+                <SidebarItem
+                  label={folderName(binding.path)}
+                  count={
+                    links?.filter((link) => hasBindingSource(link, binding.id))
+                      .length ?? 0
+                  }
+                  active={view.type === "binding" && view.id === binding.id}
+                  unavailable={binding.unavailable}
+                  title={binding.path}
+                  onSelect={() => selectBinding(binding.id)}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    selectBinding(binding.id);
+                    setMenu({
+                      binding,
+                      x: Math.min(event.clientX, window.innerWidth - 220),
+                      y: Math.min(event.clientY, window.innerHeight - 220),
+                    });
+                  }}
+                />
+                {binding.autoWatch &&
+                isNetworkPath(binding.path) &&
+                !binding.unavailable ? (
+                  <p className="sidebar-hint">{NETWORK_WATCH_HINT}</p>
+                ) : null}
+              </div>
+            ))
+          : extensions.map((ext) => (
+              <SidebarItem
+                key={ext}
+                label={extensionLabel(ext)}
+                count={
+                  links?.filter(
+                    (item) =>
+                      hasAnyBindingSource(item) && linkExtension(item) === ext,
+                  ).length ?? 0
+                }
+                active={view.type === "extension" && view.ext === ext}
+                title={ext}
+                onSelect={() => selectExtension(ext)}
+              />
+            ))}
       </div>
       {menu ? (
         <div

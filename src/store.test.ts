@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   applySelection,
+  browseTabFromView,
   selectionModeFromEvent,
+  viewForBrowseTab,
   type SelectionState,
 } from "./store";
 
@@ -104,5 +106,55 @@ describe("applySelection", () => {
     const next = applySelection(current, ids, "missing", "toggle");
     expect(selectedOf(next)).toEqual(["a"]);
     expect(next.anchorId).toBe("a");
+  });
+});
+
+describe("browseTabFromView", () => {
+  it("maps extension view to the type tab", () => {
+    expect(browseTabFromView({ type: "extension", ext: ".html" })).toBe("type");
+  });
+
+  it("maps binding and none to the folder tab", () => {
+    expect(browseTabFromView({ type: "binding", id: "b1" })).toBe("folder");
+    expect(browseTabFromView({ type: "none" })).toBe("folder");
+  });
+});
+
+describe("viewForBrowseTab", () => {
+  const bindings = [{ id: "b1" }, { id: "b2" }];
+  const extensions = [".html", ".md"];
+
+  it("restores the preferred binding when switching to folder", () => {
+    expect(viewForBrowseTab("folder", bindings, extensions, "b2")).toEqual({
+      type: "binding",
+      id: "b2",
+    });
+  });
+
+  it("falls back to the first binding when the preferred one is gone", () => {
+    expect(viewForBrowseTab("folder", bindings, extensions, "gone")).toEqual({
+      type: "binding",
+      id: "b1",
+    });
+  });
+
+  it("returns none when there are no bindings", () => {
+    expect(viewForBrowseTab("folder", [], extensions)).toEqual({ type: "none" });
+  });
+
+  it("restores the preferred extension when switching to type", () => {
+    expect(
+      viewForBrowseTab("type", bindings, extensions, undefined, ".md"),
+    ).toEqual({ type: "extension", ext: ".md" });
+  });
+
+  it("falls back to the first extension when the preferred one is gone", () => {
+    expect(
+      viewForBrowseTab("type", bindings, extensions, undefined, ".txt"),
+    ).toEqual({ type: "extension", ext: ".html" });
+  });
+
+  it("returns none when there are no extensions", () => {
+    expect(viewForBrowseTab("type", bindings, [])).toEqual({ type: "none" });
   });
 });

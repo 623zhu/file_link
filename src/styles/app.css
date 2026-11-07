@@ -36,7 +36,7 @@ button {
   border-right: 1px solid #e5e7eb;
   background: #f8fafc;
   padding: 8px 0;
-  overflow: auto;
+  overflow: hidden;
 }
 
 .sidebar-item {
@@ -97,16 +97,47 @@ button {
   line-height: 1.4;
 }
 
-.sidebar-group {
-  margin-top: 12px;
+.sidebar-tabs {
+  display: flex;
+  flex-shrink: 0;
+  margin: 4px 10px 8px;
+  padding: 3px;
+  border: 1px solid #c5d0dc;
+  border-radius: 6px;
+  background: #d6dee8;
 }
 
-.sidebar-group-title {
-  padding: 6px 16px;
-  color: #6b7280;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+.sidebar-tab {
+  flex: 1;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #3b4a5a;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sidebar-tab:focus {
+  outline: none;
+}
+
+.sidebar-tab:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.sidebar-tab.active {
+  background: #fff;
+  color: #1f2937;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.sidebar-group {
+  min-height: 0;
+  overflow: auto;
 }
 
 .main {
