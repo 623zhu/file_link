@@ -1,3 +1,41 @@
 # File Link
 
-本地文件链接管理器。产品与开发说明见 `docs/`。
+本地文件链接管理器。文件仍留在原来的位置，本软件只维护一层引用：哪些常用、按什么规则收录、从哪打开。删除的是链接，不是原文件。
+
+## 下载
+
+不需要拷贝源码。给别人用时只发 `release/` 里对应的那一个 exe：
+
+| 形式 | 文件 | 说明 |
+| --- | --- | --- |
+| 免安装版 | `FileLink_0.1.0_x64_portable.exe` | 拷到任意目录双击即可 |
+| 安装程序 | `FileLink_0.1.0_x64-setup.exe` | 当前用户安装，不需要管理员权限 |
+
+系统要求：Windows 10 / 11，64 位。界面依赖 WebView2（Windows 11 自带，Windows 10 一般已随 Edge 安装）。免安装版不会自动补装 WebView2；安装程序会在安装时检测，缺失则联网补装。
+
+尚未代码签名。首次运行时 Windows 可能提示「已保护你的电脑」，点「更多信息 → 仍要运行」即可。
+
+链接数据写在 `%APPDATA%\com.filelink.app\`，和 exe 放哪无关。校验值见 `release/SHA256SUMS.txt`。
+
+## 能做什么
+
+- 绑定文件夹，按该目录配置的文件类型生成链接（新绑定默认 `.html`、`.doc`）
+- 新文件可自动导入，或手动扫描
+- 打开原文件、在资源管理器中定位、移除链接
+- 按绑定文件夹或文件类型浏览；支持多选和键盘操作
+
+不会复制、移动或删除磁盘上的原文件，也不会整理桌面或做全盘搜索。
+
+## 开发
+
+需要 Node.js 20+、pnpm、Rust stable（Windows MSVC）和 Visual Studio C++ 桌面工作负载。
+
+```powershell
+pnpm install
+pnpm tauri dev      # 开发运行
+pnpm tauri build    # 打包免安装版和安装程序
+```
+
+检查：`pnpm lint`、`pnpm vitest run`；后端在 `src-tauri` 下跑 `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`。
+
+变更记录见 [CHANGELOG.md](CHANGELOG.md)。
