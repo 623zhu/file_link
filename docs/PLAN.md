@@ -23,7 +23,7 @@
 4. 按「完成标准」写测试并通过。
 5. 运行检查：`cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`；涉及前端时再运行 `pnpm lint` 和 `pnpm vitest run`。
 6. 在第 2 节进度表中把该任务勾选为完成。
-7. 提交，提交说明采用 Conventional Commits：以 `feat` / `fix` / `docs` / `refactor` / `test` / `chore` 开头，例如 `feat: 实现对账算法`。不要写任务编号。
+7. 每次改动完成后立刻提交，不要攒到任务结束。提交说明采用 Conventional Commits：以 `feat` / `fix` / `docs` / `refactor` / `test` / `chore` 开头，例如 `feat: 实现对账算法`。不要写任务编号。
 
 ### 1.3 完成定义
 
