@@ -219,7 +219,7 @@ fn watch_error(err: impl ToString) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::model::Data;
+    use crate::core::model::{Data, Settings};
     use crate::core::store;
     use crate::service::{add_binding, remove_binding, snapshot, update_binding};
     use chrono::Local;
@@ -234,6 +234,7 @@ mod tests {
             key: dir.to_string_lossy().to_lowercase(),
             recursive: false,
             auto_watch,
+            extensions: Settings::html_extensions(),
             rule_id: None,
             created_at: Local::now(),
             unavailable: false,
@@ -333,7 +334,14 @@ mod tests {
         let state = Arc::new(state);
         start_test_worker(&state);
 
-        let added = add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        let added = add_binding(
+            &state,
+            &files.path().to_string_lossy(),
+            false,
+            true,
+            &Settings::html_extensions(),
+        )
+        .unwrap();
         assert!(state.watcher.is_watching(&added.binding.id));
         thread::sleep(Duration::from_millis(200));
 
@@ -352,8 +360,15 @@ mod tests {
         let state = Arc::new(state);
         start_test_worker(&state);
 
-        let added = add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
-        update_binding(&state, &added.binding.id, None, Some(false)).unwrap();
+        let added = add_binding(
+            &state,
+            &files.path().to_string_lossy(),
+            false,
+            true,
+            &Settings::html_extensions(),
+        )
+        .unwrap();
+        update_binding(&state, &added.binding.id, None, Some(false), None).unwrap();
         assert!(!state.watcher.is_watching(&added.binding.id));
 
         write_html(files.path(), "manual.html");
@@ -376,7 +391,14 @@ mod tests {
         let state = Arc::new(state);
         start_test_worker(&state);
 
-        let added = add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        let added = add_binding(
+            &state,
+            &files.path().to_string_lossy(),
+            false,
+            true,
+            &Settings::html_extensions(),
+        )
+        .unwrap();
         let binding_id = added.binding.id.clone();
         assert!(state.watcher.is_watching(&binding_id));
 
@@ -408,7 +430,14 @@ mod tests {
         write_html(files.path(), "existing.html");
         let state = Arc::new(state);
         start_test_worker(&state);
-        add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        add_binding(
+            &state,
+            &files.path().to_string_lossy(),
+            false,
+            true,
+            &Settings::html_extensions(),
+        )
+        .unwrap();
         thread::sleep(Duration::from_millis(200));
 
         let growing = files.path().join("growing.html");
@@ -452,7 +481,14 @@ mod tests {
         let (files, _data_dir, state) = temp_state();
         let state = Arc::new(state);
         start_test_worker(&state);
-        add_binding(&state, &files.path().to_string_lossy(), false, true).unwrap();
+        add_binding(
+            &state,
+            &files.path().to_string_lossy(),
+            false,
+            true,
+            &Settings::html_extensions(),
+        )
+        .unwrap();
         thread::sleep(Duration::from_millis(200));
 
         let temp = files.path().join("page.html.crdownload");
