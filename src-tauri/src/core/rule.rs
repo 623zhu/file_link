@@ -89,10 +89,10 @@ mod tests {
     }
 
     #[test]
-    fn html_and_htm_match_default_rule_case_insensitively() {
+    fn html_matches_default_rule_case_insensitively() {
         let rule = default_rule();
         assert!(matches("page.HTML", &rule.extensions));
-        assert!(matches("page.Htm", &rule.extensions));
+        assert!(!matches("page.htm", &rule.extensions));
     }
 
     #[test]

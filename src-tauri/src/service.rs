@@ -798,11 +798,11 @@ mod tests {
         let mut data = Data::default();
         let err = update_settings(&mut data, &[]).unwrap_err();
         assert!(matches!(err, AppError::EmptyExtensions));
-        assert_eq!(data.settings.extensions, [".html", ".htm"]);
+        assert_eq!(data.settings.extensions, [".html"]);
 
         let err = update_settings(&mut data, &["  ".to_string(), "".to_string()]).unwrap_err();
         assert!(matches!(err, AppError::EmptyExtensions));
-        assert_eq!(data.settings.extensions, [".html", ".htm"]);
+        assert_eq!(data.settings.extensions, [".html"]);
     }
 
     #[test]
@@ -1071,7 +1071,7 @@ mod tests {
         .unwrap();
 
         let snap = snapshot(&state).unwrap();
-        assert_eq!(html.binding.extensions, [".html", ".htm"]);
+        assert_eq!(html.binding.extensions, [".html"]);
         assert_eq!(md.binding.extensions, [".md"]);
         let names: Vec<_> = snap.links.iter().map(|link| link.name.clone()).collect();
         assert!(names.contains(&"a.html".to_string()));

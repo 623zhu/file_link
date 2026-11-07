@@ -19,7 +19,7 @@ export function SettingsDialog({
     const binding = state.snapshot?.bindings.find(
       (item) => item.id === bindingId,
     );
-    return binding?.extensions ?? [".html", ".htm"];
+    return binding?.extensions ?? [".html"];
   });
   const [text, setText] = useState(extensions.join(", "));
   const [busy, setBusy] = useState(false);
@@ -75,11 +75,11 @@ export function SettingsDialog({
             value={text}
             disabled={busy}
             aria-label="文件类型"
-            placeholder=".html, .htm"
+            placeholder=".html"
             onChange={(event) => setText(event.target.value)}
             style={inputStyle}
           />
-          <span style={hintStyle}>用逗号分隔，例如 .html, .htm</span>
+          <span style={hintStyle}>选择需要绑定的文件类型，例如.html</span>
         </label>
         <div className="dialog-actions">
           <button type="button" disabled={busy} onClick={onClose}>

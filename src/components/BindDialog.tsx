@@ -22,7 +22,7 @@ function parseExtensions(text: string): string[] {
 
 export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
   const defaultExtensions = useStore(
-    (state) => state.snapshot?.settings.extensions ?? [".html", ".htm"],
+    (state) => state.snapshot?.settings.extensions ?? [".html"],
   );
   const [extensionsText, setExtensionsText] = useState(
     defaultExtensions.join(", "),
@@ -119,11 +119,11 @@ export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
               value={extensionsText}
               disabled={busy}
               aria-label="文件类型"
-              placeholder=".html, .htm"
+              placeholder=".html"
               onChange={(event) => setExtensionsText(event.target.value)}
               style={inputStyle}
             />
-            <span style={hintStyle}>用逗号分隔，例如 .html, .htm</span>
+            <span style={hintStyle}>选择需要绑定的文件类型，例如.html</span>
           </label>
           <label style={checkboxStyle}>
             <input

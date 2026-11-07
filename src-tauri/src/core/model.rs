@@ -31,7 +31,7 @@ pub struct Settings {
 
 impl Settings {
     pub fn html_extensions() -> Vec<String> {
-        vec![".html".to_string(), ".htm".to_string()]
+        vec![".html".to_string()]
     }
 }
 
@@ -169,7 +169,7 @@ mod tests {
     fn data_default_is_version_two_with_html_extensions() {
         let data = Data::default();
         assert_eq!(data.version, 2);
-        assert_eq!(data.settings.extensions, [".html", ".htm"]);
+        assert_eq!(data.settings.extensions, [".html"]);
         assert!(data.bindings.is_empty());
         assert!(data.links.is_empty());
         assert!(data.ignored.is_empty());
