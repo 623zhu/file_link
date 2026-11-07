@@ -25,17 +25,3 @@
 - 按绑定文件夹或文件类型浏览；支持多选和键盘操作
 
 不会复制、移动或删除磁盘上的原文件，也不会整理桌面或做全盘搜索。
-
-## 开发
-
-需要 Node.js 20+、pnpm、Rust stable（Windows MSVC）和 Visual Studio C++ 桌面工作负载。
-
-```powershell
-pnpm install
-pnpm tauri dev      # 开发运行
-pnpm tauri build    # 打包免安装版和安装程序
-```
-
-检查：`pnpm lint`、`pnpm vitest run`；后端在 `src-tauri` 下跑 `cargo fmt --check`、`cargo clippy -- -D warnings`、`cargo test`。
-
-变更记录见 [CHANGELOG.md](CHANGELOG.md)。
