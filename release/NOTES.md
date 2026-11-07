@@ -23,7 +23,7 @@ Get-FileHash .\FileLink_0.1.0_x64-setup.exe -Algorithm SHA256
 - 免安装版需要已安装 WebView2 Runtime（Windows 11 自带；Windows 10 大多已随 Edge 安装）。若无法启动，请到微软官网安装「WebView2 Runtime」，或改用安装程序。
 - 安装程序会在安装时检测 WebView2，缺失则联网补装。
 
-免安装版拷到任意目录双击即可运行。安装程序安装到 `%LOCALAPPDATA%\Programs\File Link\`，不需要管理员权限。两种形式的链接数据都写在 `%APPDATA%\com.filelink.app\`。
+免安装版拷到任意目录双击即可运行。安装程序安装到 `%LOCALAPPDATA%\File Link\`，不需要管理员权限。两种形式的链接数据都写在 `%APPDATA%\com.filelink.app\`。
 
 `release/` 只保留最新一份免安装版和最新一份安装程序。以后重新构建会直接覆盖它们，并删掉同目录旧包。
 
