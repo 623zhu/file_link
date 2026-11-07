@@ -80,7 +80,7 @@ file_link/
 │  ├─ store.ts                  # Zustand store
 │  ├─ components/
 │  │  ├─ Sidebar.tsx            # 绑定文件夹 / 文件类型
-│  │  ├─ Toolbar.tsx            # 绑定、扫描、设置
+│  │  ├─ Toolbar.tsx            # 绑定、扫描
 │  │  ├─ LinkList.tsx           # 虚拟列表
 │  │  ├─ LinkRow.tsx
 │  │  ├─ ConfirmDialog.tsx
@@ -157,7 +157,7 @@ flowchart LR
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
-    pub version: u32,                 // 当前为 3
+    pub version: u32,                 // 当前为 4
     pub settings: Settings,           // 新绑定的默认文件类型
     pub bindings: Vec<Binding>,
     pub links: Vec<Link>,
@@ -193,7 +193,7 @@ pub struct Link {
     pub key: String,
     pub name: String,
     pub sources: Vec<Source>,         // 至少一个；为空即删除该 link
-    pub added_at: DateTime<Local>,
+    pub modified_at: DateTime<Local>, // 原文件修改时间；扫描/对账时更新
     #[serde(default)]
     pub missing: bool,
 }
@@ -221,7 +221,7 @@ pub struct Ignore {
 - 手动导入：加入 `Manual`。
 - 绑定扫描命中：加入 `Binding { binding_id }`。
 - 解除绑定：从所有 link 中去掉该绑定来源，`sources` 变空的 link 才删除。
-- 界面「来源」列：有 `Manual` 显示「手动」，有绑定显示文件夹名，二者都有则都显示。
+- 界面不显示「来源」列；`sources` 仍用于解除绑定和忽略名单。
 
 ### 5.3 忽略名单
 
@@ -236,7 +236,7 @@ pub struct Ignore {
 - `load(path) -> Result<LoadResult>`：文件不存在返回默认数据；JSON 损坏时把原文件重命名为 `data.json.broken-<时间戳>`，返回默认数据和备份路径。
 - `save(path, data)`：必要时创建目录；先写 `data.json.tmp`，`flush` + `sync_all` 后 `rename` 覆盖 `data.json`。
 - 每次数据变更后立即保存（数据量小，不做延迟批量写入）。
-- `migrate(data)`：按 `version` 逐级迁移；当前版本为 3。版本 1 → 2：每个绑定若没有 `extensions`，则复制当时的全局 `settings.extensions`。版本 2 → 3：把 `settings.extensions` 重置为 `[".html"]`；每个绑定若 `extensions` 为空，则设为 `[".html"]`。已填写过的绑定类型保持不变。
+- `migrate(data)`：按 `version` 逐级迁移；当前版本为 4。版本 1 → 2：每个绑定若没有 `extensions`，则复制当时的全局 `settings.extensions`。版本 2 → 3：把 `settings.extensions` 重置为 `[".html"]`；每个绑定若 `extensions` 为空，则设为 `[".html"]`。已填写过的绑定类型保持不变。版本 3 → 4：把 `added_at` 改为 `modified_at`，能读到原文件则写入其修改时间，否则沿用原加入时间。
 - 读取失败后以空数据启动，并在界面提示用户。
 
 ### 5.5 TS 类型
@@ -252,7 +252,7 @@ export interface Link {
   key: string;
   name: string;
   sources: Source[];
-  addedAt: string;
+  modifiedAt: string;
   missing: boolean;
 }
 
@@ -323,8 +323,9 @@ for f in files:
     if 已存在 key == f.key 的 link:
         若 sources 不含该绑定 → 加入该绑定来源
         若 missing == true → 置为 false，restored += 1
+        用原文件修改时间更新 modified_at
     else:
-        新建 link，sources = [该绑定]，added += 1
+        新建 link，sources = [该绑定]，modified_at = 原文件修改时间，added += 1
 
 for link in 含该绑定来源的 links:
     if link.key 不在 files 中 且 文件确实不存在:
@@ -462,16 +463,16 @@ pub enum AppError {
 
 ```
 ┌──────────────┬──────────────────────────────────────────────┐
-│ [文件夹|类型]│ [绑定文件夹] [扫描新文件] [⚙]                │
+│ [文件夹|类型]│ [绑定文件夹] [扫描新文件]                    │
 │  tools  (n)  ├──────────────────────────────────────────────┤
-│              │ 名称        路径               来源      加入时间   │
-│              │ json.html   D:\tools\json.html 文件夹    11-04 15:00 │
+│              │ 名称        路径                      修改时间   │
+│              │ json.html   D:\tools\json.html        11-04 15:00 │
 └──────────────┴──────────────────────────────────────────────┘
 ```
 
 - 侧边栏顶部是「文件夹 / 类型」分段切换，同一时间只显示一组。文件夹是绑定目录（右键菜单：扫描、自动导入、包含子文件夹、文件类型、在资源管理器中打开、解除绑定）；类型按扩展名汇总已绑定链接。不提供「全部链接」「手动导入」。
-- 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。设置编辑当前选中绑定的文件类型；未选中文件夹时提示先选择。
-- 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
+- 工具栏：绑定文件夹、扫描新文件。不提供搜索、「导入文件」和设置按钮。文件类型在绑定对话框填写，之后可从侧边栏右键「文件类型」修改。
+- 列表列：名称、路径、修改时间（原文件的修改时间）。不显示来源。双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
 - 绑定对话框含文件类型，提示「选择需要绑定的文件类型，例如.html, .doc」，输入框初始值固定为 `.html, .doc`，不读取旧的全局设置。设置对话框编辑当前绑定的扩展名；若该绑定尚未填写类型，显示 `.html`。保存时提示「新规则将在之后的扫描中生效」。
 
