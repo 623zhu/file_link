@@ -74,6 +74,15 @@ fn migrate(mut data: Data) -> Data {
                 }
                 data.version = 2;
             }
+            2 => {
+                data.settings.extensions = Settings::html_extensions();
+                for binding in &mut data.bindings {
+                    if binding.extensions.is_empty() {
+                        binding.extensions = Settings::html_extensions();
+                    }
+                }
+                data.version = 3;
+            }
             _ => break,
         }
     }
@@ -108,7 +117,7 @@ mod tests {
 
     fn sample_data() -> Data {
         Data {
-            version: 2,
+            version: 3,
             settings: Default::default(),
             bindings: Vec::new(),
             links: vec![Link {
@@ -200,7 +209,7 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&data).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 2);
+        assert_eq!(loaded.data.version, 3);
         assert_eq!(loaded.data.settings, Data::default().settings);
     }
 
@@ -226,7 +235,49 @@ mod tests {
         fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
 
         let loaded = load(&path).unwrap();
-        assert_eq!(loaded.data.version, 2);
+        assert_eq!(loaded.data.version, 3);
+        assert_eq!(loaded.data.settings.extensions, [".html"]);
         assert_eq!(loaded.data.bindings[0].extensions, [".md"]);
+    }
+
+    #[test]
+    fn migrate_resets_stale_global_extensions() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("data.json");
+        let json = serde_json::json!({
+            "version": 2,
+            "settings": { "extensions": [".html", ".htm", ".md", ".doc"] },
+            "bindings": [
+                {
+                    "id": "empty",
+                    "path": r"D:\pages",
+                    "key": r"d:\pages",
+                    "recursive": true,
+                    "autoWatch": true,
+                    "extensions": [],
+                    "ruleId": null,
+                    "createdAt": "2026-11-04T15:00:00+08:00",
+                },
+                {
+                    "id": "custom",
+                    "path": r"D:\notes",
+                    "key": r"d:\notes",
+                    "recursive": true,
+                    "autoWatch": true,
+                    "extensions": [".md"],
+                    "ruleId": null,
+                    "createdAt": "2026-11-04T15:00:00+08:00",
+                }
+            ],
+            "links": [],
+            "ignored": []
+        });
+        fs::write(&path, serde_json::to_vec(&json).unwrap()).unwrap();
+
+        let loaded = load(&path).unwrap();
+        assert_eq!(loaded.data.version, 3);
+        assert_eq!(loaded.data.settings.extensions, [".html"]);
+        assert_eq!(loaded.data.bindings[0].extensions, [".html"]);
+        assert_eq!(loaded.data.bindings[1].extensions, [".md"]);
     }
 }

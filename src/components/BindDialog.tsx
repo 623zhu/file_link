@@ -21,12 +21,7 @@ function parseExtensions(text: string): string[] {
 }
 
 export function BindDialog({ path, onClose, onToast }: BindDialogProps) {
-  const defaultExtensions = useStore(
-    (state) => state.snapshot?.settings.extensions ?? [".html"],
-  );
-  const [extensionsText, setExtensionsText] = useState(
-    defaultExtensions.join(", "),
-  );
+  const [extensionsText, setExtensionsText] = useState(".html");
   const [recursive, setRecursive] = useState(true);
   const [autoWatch, setAutoWatch] = useState(true);
   const [busy, setBusy] = useState(false);

@@ -19,7 +19,8 @@ export function SettingsDialog({
     const binding = state.snapshot?.bindings.find(
       (item) => item.id === bindingId,
     );
-    return binding?.extensions ?? [".html"];
+    const items = binding?.extensions ?? [];
+    return items.length > 0 ? items : [".html"];
   });
   const [text, setText] = useState(extensions.join(", "));
   const [busy, setBusy] = useState(false);

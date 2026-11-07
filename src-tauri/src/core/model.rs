@@ -14,7 +14,7 @@ pub struct Data {
 impl Default for Data {
     fn default() -> Self {
         Self {
-            version: 2,
+            version: 3,
             settings: Settings::default(),
             bindings: Vec::new(),
             links: Vec::new(),
@@ -146,7 +146,7 @@ mod tests {
 
     fn sample_data() -> Data {
         Data {
-            version: 2,
+            version: 3,
             settings: Settings::default(),
             bindings: vec![sample_binding()],
             links: vec![sample_link()],
@@ -166,9 +166,9 @@ mod tests {
     }
 
     #[test]
-    fn data_default_is_version_two_with_html_extensions() {
+    fn data_default_is_version_three_with_html_extensions() {
         let data = Data::default();
-        assert_eq!(data.version, 2);
+        assert_eq!(data.version, 3);
         assert_eq!(data.settings.extensions, [".html"]);
         assert!(data.bindings.is_empty());
         assert!(data.links.is_empty());
