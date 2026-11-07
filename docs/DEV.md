@@ -157,7 +157,7 @@ flowchart LR
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Data {
-    pub version: u32,                 // 当前为 2
+    pub version: u32,                 // 当前为 3
     pub settings: Settings,           // 新绑定的默认文件类型
     pub bindings: Vec<Binding>,
     pub links: Vec<Link>,
@@ -236,7 +236,7 @@ pub struct Ignore {
 - `load(path) -> Result<LoadResult>`：文件不存在返回默认数据；JSON 损坏时把原文件重命名为 `data.json.broken-<时间戳>`，返回默认数据和备份路径。
 - `save(path, data)`：必要时创建目录；先写 `data.json.tmp`，`flush` + `sync_all` 后 `rename` 覆盖 `data.json`。
 - 每次数据变更后立即保存（数据量小，不做延迟批量写入）。
-- `migrate(data)`：按 `version` 逐级迁移；当前版本为 2。版本 1 → 2：每个绑定若没有 `extensions`，则复制当时的全局 `settings.extensions`。
+- `migrate(data)`：按 `version` 逐级迁移；当前版本为 3。版本 1 → 2：每个绑定若没有 `extensions`，则复制当时的全局 `settings.extensions`。版本 2 → 3：把 `settings.extensions` 重置为 `[".html"]`；每个绑定若 `extensions` 为空，则设为 `[".html"]`。已填写过的绑定类型保持不变。
 - 读取失败后以空数据启动，并在界面提示用户。
 
 ### 5.5 TS 类型
@@ -473,7 +473,7 @@ pub enum AppError {
 - 工具栏：绑定文件夹、扫描新文件、设置。不提供搜索和「导入文件」。设置编辑当前选中绑定的文件类型；未选中文件夹时提示先选择。
 - 列表：双击或回车打开；右键菜单：打开、在资源管理器中显示、复制路径、移除链接；支持 Ctrl / Shift 多选后批量移除。无绑定时提示「请先绑定文件夹」。
 - 缺失的 link 灰显并带「缺失」标签，打开时提示「文件不存在或已被移动，可以从列表中移除该链接」。
-- 绑定对话框含文件类型，提示「选择需要绑定的文件类型，例如.html」，默认 `.html`。设置对话框编辑当前绑定的扩展名，保存时提示「新规则将在之后的扫描中生效」。
+- 绑定对话框含文件类型，提示「选择需要绑定的文件类型，例如.html」，输入框初始值固定为 `.html`，不读取旧的全局设置。设置对话框编辑当前绑定的扩展名；若该绑定尚未填写类型，显示 `.html`。保存时提示「新规则将在之后的扫描中生效」。
 
 ### 9.2 状态
 
