@@ -23,5 +23,5 @@
 - 设计要改时，先改 `docs/DEV.md`，再改代码。不要另起一套并行计划。
 - 请求和 `docs/PLAN.md` 冲突时先停下来说明，不要自行改计划。
 - 不要对原文件做写入、重命名、删除。产品只管理链接。
-- 更新免安装版后，`release/` 只保留最新一份 exe。用新文件覆盖 `FileLink_<版本>_x64_portable.exe`，并删除同目录其它 `.exe`（包括临时的 `file-link.exe`）。同时更新 `release/SHA256SUMS.txt` 和 `release/NOTES.md`。
+- 更新发布文件后，`release/` 只保留最新一份免安装版 `FileLink_<版本>_x64_portable.exe` 和最新一份安装程序 `FileLink_<版本>_x64-setup.exe`。覆盖这两个文件，并删除同目录其它 `.exe`（包括临时的 `file-link.exe`）。同时更新 `release/SHA256SUMS.txt` 和 `release/NOTES.md`。
 - 上一个里程碑验收通过后，才开始下一个里程碑。
