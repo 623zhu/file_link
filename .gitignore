@@ -40,9 +40,11 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 
+# Local docs and editor config (not published)
+docs/
+.vscode/
+
 # Editors
-.vscode/*
-!.vscode/extensions.json
 .idea/
 *.suo
 *.ntvs*
