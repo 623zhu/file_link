@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { openLink, revealLink } from "../api/commands";
 import type { Link } from "../types";
@@ -125,45 +126,48 @@ export function LinkRow({
         {link.path}
       </div>
       <div className="link-cell">{formatModifiedAt(link.modifiedAt)}</div>
-      {menu ? (
-        <div
-          className="context-menu"
-          style={{ left: menu.x, top: menu.y }}
-          role="menu"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void handleOpen()}
-          >
-            打开
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void handleReveal()}
-          >
-            在资源管理器中显示
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => void handleCopyPath()}
-          >
-            复制路径
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setMenu(null);
-              onRequestRemove();
-            }}
-          >
-            移除链接
-          </button>
-        </div>
-      ) : null}
+      {menu
+        ? createPortal(
+            <div
+              className="context-menu"
+              style={{ left: menu.x, top: menu.y }}
+              role="menu"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void handleOpen()}
+              >
+                打开
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void handleReveal()}
+              >
+                在资源管理器中显示
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => void handleCopyPath()}
+              >
+                复制路径
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenu(null);
+                  onRequestRemove();
+                }}
+              >
+                移除链接
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
