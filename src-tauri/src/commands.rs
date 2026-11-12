@@ -36,7 +36,10 @@ pub fn open_link(app: AppHandle, state: State<AppState>, id: String) -> Result<(
             .open_path(path, None::<&str>)
             .map_err(open_failed);
     }
-    service::write_and_emit(&state, &app, |data| service::mark_missing(data, &id))?;
+    if service::link_has_unavailable_binding(&state, &id)? {
+        return Err(AppError::BindingUnavailable);
+    }
+    service::write_and_emit(&state, &app, |data| service::remove_gone_link(data, &id))?;
     Err(AppError::FileMissing)
 }
 
@@ -47,10 +50,17 @@ pub fn reveal_link(app: AppHandle, state: State<AppState>, id: String) -> Result
     if path.is_file() {
         return app.opener().reveal_item_in_dir(path).map_err(open_failed);
     }
-    if let Some(parent) = path.parent().filter(|parent| parent.is_dir()) {
+    let parent = path
+        .parent()
+        .filter(|parent| parent.is_dir())
+        .map(|parent| parent.to_string_lossy().into_owned());
+    if !service::link_has_unavailable_binding(&state, &id)? {
+        service::write_and_emit(&state, &app, |data| service::remove_gone_link(data, &id))?;
+    }
+    if let Some(parent) = parent {
         return app
             .opener()
-            .open_path(parent.to_string_lossy().into_owned(), None::<&str>)
+            .open_path(parent, None::<&str>)
             .map_err(open_failed);
     }
     Err(AppError::FileMissing)

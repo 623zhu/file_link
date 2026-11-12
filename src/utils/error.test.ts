@@ -8,11 +8,11 @@ describe("errorMessage", () => {
       errorMessage(
         {
           code: "FileMissing",
-          message: "文件不存在或已被移动，可以从列表中移除该链接",
+          message: "文件不存在或已被移动，已从列表中移除该链接",
         },
-        "打开失败，请确认文件仍在原位置，或从列表中移除该链接",
+        "打开失败，请确认文件仍在原位置",
       ),
-    ).toBe("文件不存在或已被移动，可以从列表中移除该链接");
+    ).toBe("文件不存在或已被移动，已从列表中移除该链接");
   });
 
   it("ignores english plugin errors and uses the fallback", () => {

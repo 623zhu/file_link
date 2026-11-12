@@ -105,10 +105,10 @@ pub fn start_catch_up<R: Runtime>(app: AppHandle<R>) {
             match catch_up(&state) {
                 Ok(summary) => {
                     log::info!(
-                        "startup catch-up finished: added={}, restored={}, missing={}",
+                        "startup catch-up finished: added={}, restored={}, removed={}",
                         summary.added,
                         summary.restored,
-                        summary.missing
+                        summary.removed
                     );
                     emit_unavailable_bindings(&state, &app);
                     if let Err(err) = app.emit("state-changed", ()) {
@@ -225,14 +225,29 @@ pub fn link_path(state: &AppState, id: &str) -> Result<String, AppError> {
         .ok_or(AppError::NotFound)
 }
 
-pub fn mark_missing(data: &mut Data, id: &str) -> Result<(), AppError> {
+pub fn remove_gone_link(data: &mut Data, id: &str) -> Result<(), AppError> {
+    let before = data.links.len();
+    data.links.retain(|link| link.id != id);
+    if data.links.len() == before {
+        return Err(AppError::NotFound);
+    }
+    Ok(())
+}
+
+pub fn link_has_unavailable_binding(state: &AppState, id: &str) -> Result<bool, AppError> {
+    let data = lock(&state.data)?;
     let link = data
         .links
-        .iter_mut()
+        .iter()
         .find(|link| link.id == id)
         .ok_or(AppError::NotFound)?;
-    link.missing = true;
-    Ok(())
+    Ok(link.sources.iter().any(|source| match source {
+        Source::Binding { binding_id } => data
+            .bindings
+            .iter()
+            .any(|binding| binding.id == *binding_id && binding.unavailable),
+        Source::Manual => false,
+    }))
 }
 
 pub fn normalize_extensions(extensions: &[String]) -> Result<Vec<String>, AppError> {
@@ -464,12 +479,12 @@ fn reconcile_scanned(
                 state.watcher.schedule_reconcile(id, Duration::from_secs(2));
             }
             log::info!(
-                "reconciled binding {} at {}: added={}, restored={}, missing={}",
+                "reconciled binding {} at {}: added={}, restored={}, removed={}",
                 id,
                 binding.path,
                 summary.added,
                 summary.restored,
-                summary.missing
+                summary.removed
             );
             Ok(summary)
         }
@@ -514,7 +529,7 @@ pub fn scan_all(state: &AppState) -> Result<ReconcileSummary, AppError> {
                     let part = reconcile::reconcile(data, id, files, file_exists);
                     summary.added += part.added;
                     summary.restored += part.restored;
-                    summary.missing += part.missing;
+                    summary.removed += part.removed;
                 }
                 Err(()) => {
                     if let Some(binding) =
@@ -525,7 +540,7 @@ pub fn scan_all(state: &AppState) -> Result<ReconcileSummary, AppError> {
                 }
             }
         }
-        reconcile::refresh_missing(data, file_exists);
+        summary.removed += reconcile::remove_gone(data, file_exists);
         Ok(summary)
     })?;
     sync_all_watchers(state);
@@ -1132,6 +1147,11 @@ mod tests {
                 .iter()
                 .any(|link| link.name == "ok.html" && !link.missing)
         );
+        assert!(
+            snap.links
+                .iter()
+                .any(|link| link.name == "gone.html" && !link.missing)
+        );
     }
 
     fn scanned(path: &Path) -> (String, String) {
@@ -1224,7 +1244,7 @@ mod tests {
     }
 
     #[test]
-    fn catch_up_imports_offline_changes_and_marks_missing() {
+    fn catch_up_imports_offline_changes_and_removes_gone_files() {
         let files = tempfile::tempdir().unwrap();
         let a = write_html(files.path(), "a.html");
         let (_data_dir, state) = temp_state(Data::default());
@@ -1239,13 +1259,9 @@ mod tests {
         let snap = snapshot(&state).unwrap();
 
         assert_eq!(summary.added, 2);
-        assert_eq!(summary.missing, 1);
-        assert_eq!(snap.links.len(), 3);
-        assert!(
-            snap.links
-                .iter()
-                .any(|link| link.name == "a.html" && link.missing)
-        );
+        assert_eq!(summary.removed, 1);
+        assert_eq!(snap.links.len(), 2);
+        assert!(!snap.links.iter().any(|link| link.name == "a.html"));
         assert!(
             snap.links
                 .iter()

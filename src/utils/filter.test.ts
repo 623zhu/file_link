@@ -48,9 +48,9 @@ describe("filterLinks", () => {
   it("keeps links that include the selected binding", () => {
     expect(ids(filterLinks(links, { type: "binding", id: "b1" }))).toEqual([
       "both",
+      "missing-binding",
       "note",
       "only-binding",
-      "missing-binding",
     ]);
   });
 
@@ -68,7 +68,7 @@ describe("filterLinks", () => {
 
   it("keeps bound links of the selected file type", () => {
     expect(ids(filterLinks(links, { type: "extension", ext: ".html" }))).toEqual(
-      ["both", "only-binding", "other-binding", "missing-binding"],
+      ["both", "missing-binding", "only-binding", "other-binding"],
     );
     expect(ids(filterLinks(links, { type: "extension", ext: ".md" }))).toEqual([
       "note",
@@ -89,18 +89,18 @@ describe("listedExtensions", () => {
 });
 
 describe("filterLinks sort", () => {
-  it("puts missing links last and sorts the rest by name", () => {
+  it("sorts by name", () => {
     const unsorted: Link[] = [
       link("zeta", [binding]),
-      link("alpha", [binding], true),
+      link("alpha", [binding]),
       link("Beta", [binding]),
-      link("gamma", [binding], true),
+      link("gamma", [binding]),
     ];
     expect(ids(filterLinks(unsorted, { type: "binding", id: "b1" }))).toEqual([
-      "Beta",
-      "zeta",
       "alpha",
+      "Beta",
       "gamma",
+      "zeta",
     ]);
   });
 });

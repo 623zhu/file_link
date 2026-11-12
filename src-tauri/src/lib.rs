@@ -6,7 +6,7 @@ mod watcher;
 
 pub use core::model::{Binding, Data, Ignore, Link, Settings, Source};
 pub use core::path::normalize;
-pub use core::reconcile::{ReconcileSummary, reconcile, refresh_missing, unbind};
+pub use core::reconcile::{ReconcileSummary, reconcile, remove_gone, unbind};
 pub use core::rule::{Rule, effective_rule, is_skipped_dir, is_temp_file, matches};
 pub use core::scanner::scan;
 pub use core::store::{LoadResult, load, save};

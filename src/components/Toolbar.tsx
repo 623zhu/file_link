@@ -29,7 +29,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
     try {
       const summary = await scanAll();
       onToast(
-        `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
+        `新增 ${summary.added}，恢复 ${summary.restored}，移除 ${summary.removed}`,
       );
     } catch (err) {
       onToast(errorMessage(err, "扫描失败，请确认绑定的文件夹仍可访问后重试"));

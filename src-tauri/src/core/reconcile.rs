@@ -12,7 +12,7 @@ use super::path;
 pub struct ReconcileSummary {
     pub added: usize,
     pub restored: usize,
-    pub missing: usize,
+    pub removed: usize,
 }
 
 pub fn reconcile(
@@ -54,32 +54,49 @@ pub fn reconcile(
         }
     }
 
-    for link in data.links.iter_mut() {
+    data.links.retain(|link| {
         if !link.has_source(&source) {
-            continue;
+            return true;
         }
         if scanned_keys.contains(link.key.as_str()) || exists(&link.path) {
-            continue;
+            return true;
         }
-        if !link.missing {
-            link.missing = true;
-            summary.missing += 1;
-        }
-    }
+        summary.removed += 1;
+        false
+    });
 
     summary
 }
 
-pub fn refresh_missing(data: &mut Data, exists: impl Fn(&str) -> bool) -> usize {
-    let mut changed = 0;
+pub fn remove_gone(data: &mut Data, exists: impl Fn(&str) -> bool) -> usize {
+    let unavailable: HashSet<String> = data
+        .bindings
+        .iter()
+        .filter(|binding| binding.unavailable)
+        .map(|binding| binding.id.clone())
+        .collect();
     for link in &mut data.links {
-        let missing = !exists(&link.path);
-        if link.missing != missing {
-            link.missing = missing;
-            changed += 1;
+        if exists(&link.path) {
+            link.missing = false;
         }
     }
-    changed
+    let mut removed = 0;
+    data.links.retain(|link| {
+        if exists(&link.path) {
+            return true;
+        }
+        let keep = link.sources.iter().any(|source| match source {
+            Source::Binding { binding_id } => unavailable.contains(binding_id),
+            Source::Manual => false,
+        });
+        if keep {
+            true
+        } else {
+            removed += 1;
+            false
+        }
+    });
+    removed
 }
 
 pub fn unbind(data: &mut Data, binding_id: &str) -> usize {
@@ -172,7 +189,7 @@ mod tests {
             ReconcileSummary {
                 added: 2,
                 restored: 0,
-                missing: 0
+                removed: 0
             }
         );
         assert_eq!(second, ReconcileSummary::default());
@@ -200,21 +217,41 @@ mod tests {
     }
 
     #[test]
-    fn gone_files_are_marked_missing_and_restored_when_they_return() {
+    fn gone_files_are_removed_and_reimported_when_they_return() {
         let mut data = Data::default();
         let files = [file("gone.html")];
         reconcile(&mut data, BINDING, &files, always_exists);
 
-        let missing = reconcile(&mut data, BINDING, &[], always_missing);
+        let removed = reconcile(&mut data, BINDING, &[], always_missing);
         assert_eq!(
-            missing,
+            removed,
             ReconcileSummary {
                 added: 0,
                 restored: 0,
-                missing: 1
+                removed: 1
             }
         );
-        assert!(data.links[0].missing);
+        assert!(data.links.is_empty());
+
+        let added = reconcile(&mut data, BINDING, &files, always_exists);
+        assert_eq!(
+            added,
+            ReconcileSummary {
+                added: 1,
+                restored: 0,
+                removed: 0
+            }
+        );
+        assert_eq!(data.links.len(), 1);
+        assert!(!data.links[0].missing);
+    }
+
+    #[test]
+    fn old_missing_links_are_restored_when_the_file_returns() {
+        let mut data = Data::default();
+        data.links
+            .push(link("gone.html", vec![binding_source(BINDING)], true));
+        let files = [file("gone.html")];
 
         let restored = reconcile(&mut data, BINDING, &files, always_exists);
         assert_eq!(
@@ -222,11 +259,11 @@ mod tests {
             ReconcileSummary {
                 added: 0,
                 restored: 1,
-                missing: 0
+                removed: 0
             }
         );
-        assert!(!data.links[0].missing);
         assert_eq!(data.links.len(), 1);
+        assert!(!data.links[0].missing);
     }
 
     #[test]
@@ -303,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn refresh_missing_updates_manual_links() {
+    fn remove_gone_deletes_missing_manual_links_and_clears_restored_flag() {
         let mut data = Data::default();
         data.links
             .push(link("present.html", vec![Source::Manual], true));
@@ -311,21 +348,39 @@ mod tests {
             .push(link("absent.html", vec![Source::Manual], false));
         let present = data.links[0].path.clone();
 
-        let changed = refresh_missing(&mut data, exists_among(std::slice::from_ref(&present)));
+        let removed = remove_gone(&mut data, exists_among(std::slice::from_ref(&present)));
 
-        assert_eq!(changed, 2);
-        let present_link = data
-            .links
-            .iter()
-            .find(|link| link.name == "present.html")
-            .unwrap();
-        let absent_link = data
-            .links
-            .iter()
-            .find(|link| link.name == "absent.html")
-            .unwrap();
-        assert!(!present_link.missing);
-        assert!(absent_link.missing);
+        assert_eq!(removed, 1);
+        assert_eq!(data.links.len(), 1);
+        assert_eq!(data.links[0].name, "present.html");
+        assert!(!data.links[0].missing);
+    }
+
+    #[test]
+    fn remove_gone_keeps_links_when_binding_is_unavailable() {
+        use crate::core::model::Binding;
+        let mut data = Data::default();
+        data.bindings.push(Binding {
+            id: BINDING.to_string(),
+            path: r"D:\bind".to_string(),
+            key: r"d:\bind".to_string(),
+            recursive: false,
+            auto_watch: true,
+            extensions: crate::core::model::Settings::html_extensions(),
+            rule_id: None,
+            created_at: sample_time(),
+            unavailable: true,
+        });
+        data.links
+            .push(link("offline.html", vec![binding_source(BINDING)], false));
+        data.links
+            .push(link("manual-gone.html", vec![Source::Manual], false));
+
+        let removed = remove_gone(&mut data, always_missing);
+
+        assert_eq!(removed, 1);
+        assert_eq!(data.links.len(), 1);
+        assert_eq!(data.links[0].name, "offline.html");
     }
 
     #[test]

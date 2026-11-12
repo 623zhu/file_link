@@ -3,7 +3,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AppError {
-    #[error("文件不存在或已被移动，可以从列表中移除该链接")]
+    #[error("文件不存在或已被移动，已从列表中移除该链接")]
     FileMissing,
     #[error("该文件夹已经绑定过了，可以在侧边栏中管理已有绑定")]
     BindingExists,
@@ -60,7 +60,7 @@ mod tests {
             value,
             json!({
                 "code": "FileMissing",
-                "message": "文件不存在或已被移动，可以从列表中移除该链接"
+                "message": "文件不存在或已被移动，已从列表中移除该链接"
             })
         );
     }

@@ -64,7 +64,7 @@ export interface RemoveBindingResult {
 export interface ReconcileSummary {
   added: number;
   restored: number;
-  missing: number;
+  removed: number;
 }
 
 export interface RemoveLinksResult {

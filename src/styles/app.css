@@ -197,10 +197,6 @@ button {
   background: #bfdbfe;
 }
 
-.link-row.missing {
-  color: #9ca3af;
-}
-
 .link-list:focus {
   outline: none;
 }
@@ -222,15 +218,6 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.missing-badge {
-  flex-shrink: 0;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: #f3f4f6;
-  color: #6b7280;
-  font-size: 11px;
 }
 
 .link-empty {

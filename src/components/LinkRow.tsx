@@ -56,7 +56,7 @@ export function LinkRow({
       onToast(
         errorMessage(
           err,
-          "打开失败，请确认文件仍在原位置，或从列表中移除该链接",
+          "打开失败，请确认文件仍在原位置",
         ),
       );
     }
@@ -83,11 +83,7 @@ export function LinkRow({
     }
   }
 
-  const className = [
-    "link-row",
-    link.missing ? "missing" : "",
-    selected ? "selected" : "",
-  ]
+  const className = ["link-row", selected ? "selected" : ""]
     .filter((part) => part.length > 0)
     .join(" ");
 
@@ -120,7 +116,6 @@ export function LinkRow({
         <span className="link-name-text" title={link.name}>
           {link.name}
         </span>
-        {link.missing ? <span className="missing-badge">缺失</span> : null}
       </div>
       <div className="link-cell" title={link.path}>
         {link.path}

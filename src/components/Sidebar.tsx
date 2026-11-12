@@ -71,7 +71,7 @@ export function Sidebar({ onToast }: SidebarProps) {
     try {
       const summary = await scanBinding(binding.id);
       onToast(
-        `新增 ${summary.added}，恢复 ${summary.restored}，缺失 ${summary.missing}`,
+        `新增 ${summary.added}，恢复 ${summary.restored}，移除 ${summary.removed}`,
       );
     } catch (err) {
       onToast(errorMessage(err, "扫描失败，请确认文件夹仍可访问后重试"));
