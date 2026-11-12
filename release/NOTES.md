@@ -6,8 +6,8 @@
 SHA256：
 
 ```
-8E8C98139FFE6D039AF1F06915B502710D771AF74EB2031B44EF711664B5568C  FileLink_0.1.0_x64_portable.exe
-689C7B9789AFCD01A5AF126712D7DD3094AD6D1ED15F9F3713462B684C588A6F  FileLink_0.1.0_x64-setup.exe
+5CF96960DA62FEBC01C9104250F7BC6C236129F66755B8F9ADBFB8128DC5B001  FileLink_0.1.0_x64_portable.exe
+ED50BC3A5B7CFB31105566E1103C9ED00821E861A2D5BD7D243EA0BF22A75556  FileLink_0.1.0_x64-setup.exe
 ```
 
 也可用同目录的 `SHA256SUMS.txt` 校验：
@@ -33,7 +33,7 @@ Get-FileHash .\FileLink_0.1.0_x64-setup.exe -Algorithm SHA256
 - 自动导入或手动扫描新文件
 - 打开、在资源管理器中定位、移除链接（只删除链接，不删除原文件）
 - 按文件夹或文件类型浏览、多选批量操作、键盘操作、长列表虚拟滚动
-- 绑定文件夹时可配置该目录的文件类型；链接失效时标记「缺失」
+- 绑定文件夹时可配置该目录的文件类型；原文件删除或移走后从列表移除链接
 - 自定义应用图标；release 构建无控制台窗口
 - NSIS 安装程序：当前用户安装、简体中文，卸载时默认保留链接数据
 - 不提供全部链接 / 手动导入视图，不提供搜索
