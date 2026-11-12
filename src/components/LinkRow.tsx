@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { openLink, revealLink } from "../api/commands";
+import { openLink, revealLink, setStarred } from "../api/commands";
 import type { Link } from "../types";
 import { errorMessage } from "../utils/error";
 
@@ -83,6 +83,15 @@ export function LinkRow({
     }
   }
 
+  async function handleStar() {
+    setMenu(null);
+    try {
+      await setStarred(link.id, !link.starred);
+    } catch (err) {
+      onToast(errorMessage(err, "更新星标失败，请稍后重试"));
+    }
+  }
+
   const className = ["link-row", selected ? "selected" : ""]
     .filter((part) => part.length > 0)
     .join(" ");
@@ -96,7 +105,7 @@ export function LinkRow({
         if (event.detail > 1) {
           return;
         }
-        if ((event.target as HTMLElement).closest(".context-menu")) {
+        if ((event.target as HTMLElement).closest(".context-menu, .link-star")) {
           return;
         }
         onSelect(event);
@@ -108,10 +117,23 @@ export function LinkRow({
         onEnsureSelected();
         setMenu({
           x: Math.min(event.clientX, window.innerWidth - 200),
-          y: Math.min(event.clientY, window.innerHeight - 180),
+          y: Math.min(event.clientY, window.innerHeight - 220),
         });
       }}
     >
+      <button
+        type="button"
+        className={link.starred ? "link-star starred" : "link-star"}
+        aria-label={link.starred ? "取消星标" : "标星"}
+        aria-pressed={link.starred}
+        onClick={(event) => {
+          event.stopPropagation();
+          void handleStar();
+        }}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        <StarIcon filled={link.starred} />
+      </button>
       <div className="link-cell link-name">
         <span className="link-name-text" title={link.name}>
           {link.name}
@@ -152,6 +174,13 @@ export function LinkRow({
               <button
                 type="button"
                 role="menuitem"
+                onClick={() => void handleStar()}
+              >
+                {link.starred ? "取消星标" : "标星"}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
                 onClick={() => {
                   setMenu(null);
                   onRequestRemove();
@@ -164,6 +193,19 @@ export function LinkRow({
           )
         : null}
     </div>
+  );
+}
+
+function StarIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+      <path
+        d="M8 1.4 9.94 5.33l4.36.37-3.32 2.87.99 4.26L8 10.72 4.03 12.83l.99-4.26-3.32-2.87 4.36-.37Z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

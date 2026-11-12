@@ -64,6 +64,10 @@ export function removeLinks(ids: string[]): Promise<RemoveLinksResult> {
   return invoke("remove_links", { ids });
 }
 
+export function setStarred(id: string, starred: boolean): Promise<void> {
+  return invoke("set_starred", { id, starred });
+}
+
 export function openLink(id: string): Promise<void> {
   return invoke("open_link", { id });
 }

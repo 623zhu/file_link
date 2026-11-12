@@ -9,6 +9,7 @@ export interface Link {
   sources: Source[];
   modifiedAt: string;
   missing: boolean;
+  starred: boolean;
 }
 
 export interface Binding {

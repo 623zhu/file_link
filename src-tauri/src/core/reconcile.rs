@@ -49,6 +49,7 @@ pub fn reconcile(
                 sources: vec![source.clone()],
                 modified_at: path::file_modified_at(display),
                 missing: false,
+                starred: false,
             });
             summary.added += 1;
         }
@@ -154,6 +155,7 @@ mod tests {
             sources,
             modified_at: sample_time(),
             missing,
+            starred: false,
         }
     }
 
@@ -214,6 +216,20 @@ mod tests {
 
         assert_eq!(summary, ReconcileSummary::default());
         assert!(data.links.is_empty());
+    }
+
+    #[test]
+    fn reconcile_keeps_starred_on_existing_link() {
+        let files = [file("starred.html")];
+        let mut data = Data::default();
+        let mut existing = link("starred.html", vec![binding_source(BINDING)], false);
+        existing.starred = true;
+        data.links.push(existing);
+
+        reconcile(&mut data, BINDING, &files, always_exists);
+
+        assert_eq!(data.links.len(), 1);
+        assert!(data.links[0].starred);
     }
 
     #[test]

@@ -75,6 +75,8 @@ pub struct Link {
     pub modified_at: DateTime<Local>,
     #[serde(default)]
     pub missing: bool,
+    #[serde(default)]
+    pub starred: bool,
 }
 
 impl Link {
@@ -146,6 +148,7 @@ mod tests {
             sources: vec![Source::Manual],
             modified_at: sample_time(),
             missing: false,
+            starred: false,
         }
     }
 
@@ -204,6 +207,7 @@ mod tests {
 
         let link = &value["links"][0];
         assert!(link.get("modifiedAt").is_some());
+        assert!(link.get("starred").is_some());
         assert!(link.get("addedAt").is_none());
         assert!(link.get("modified_at").is_none());
 
@@ -246,8 +250,10 @@ mod tests {
 
         let mut link = serde_json::to_value(sample_link()).unwrap();
         link.as_object_mut().unwrap().remove("missing");
+        link.as_object_mut().unwrap().remove("starred");
         let link: Link = serde_json::from_value(link).unwrap();
         assert!(!link.missing);
+        assert!(!link.starred);
     }
 
     #[test]

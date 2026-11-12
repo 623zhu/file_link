@@ -138,6 +138,7 @@ mod tests {
                     .with_ymd_and_hms(2026, 11, 4, 15, 0, 0)
                     .unwrap(),
                 missing: false,
+                starred: false,
             }],
             ignored: Vec::new(),
         }

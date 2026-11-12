@@ -76,6 +76,18 @@ pub fn remove_links(
 }
 
 #[tauri::command]
+pub fn set_starred(
+    app: AppHandle,
+    state: State<AppState>,
+    id: String,
+    starred: bool,
+) -> Result<(), AppError> {
+    service::write_and_emit(&state, &app, |data| {
+        service::set_starred(data, &id, starred)
+    })
+}
+
+#[tauri::command]
 pub fn preview_binding(
     state: State<AppState>,
     path: String,

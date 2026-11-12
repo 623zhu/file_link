@@ -41,6 +41,7 @@ pub fn run() {
             commands::open_link,
             commands::reveal_link,
             commands::remove_links,
+            commands::set_starred,
             commands::preview_binding,
             commands::add_binding,
             commands::update_binding,

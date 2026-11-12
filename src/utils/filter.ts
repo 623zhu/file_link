@@ -64,6 +64,9 @@ function extensionOf(value: string): string {
 
 function sortLinks(links: Link[]): Link[] {
   return [...links].sort((a, b) => {
+    if (a.starred !== b.starred) {
+      return a.starred ? -1 : 1;
+    }
     const byName = a.name.localeCompare(b.name, "en", { sensitivity: "base" });
     if (byName !== 0) {
       return byName;

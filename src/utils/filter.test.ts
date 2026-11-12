@@ -7,7 +7,7 @@ function link(
   id: string,
   sources: Source[],
   missing = false,
-  extras: Partial<Pick<Link, "name" | "path">> = {},
+  extras: Partial<Pick<Link, "name" | "path" | "starred">> = {},
 ): Link {
   return {
     id,
@@ -17,6 +17,7 @@ function link(
     sources,
     modifiedAt: "2026-11-04T15:00:00+08:00",
     missing,
+    starred: extras.starred ?? false,
   };
 }
 
@@ -100,6 +101,21 @@ describe("filterLinks sort", () => {
       "alpha",
       "Beta",
       "gamma",
+      "zeta",
+    ]);
+  });
+
+  it("pins starred links to the top", () => {
+    const unsorted: Link[] = [
+      link("zeta", [binding]),
+      link("alpha", [binding]),
+      link("Beta", [binding], false, { starred: true }),
+      link("gamma", [binding], false, { starred: true }),
+    ];
+    expect(ids(filterLinks(unsorted, { type: "binding", id: "b1" }))).toEqual([
+      "Beta",
+      "gamma",
+      "alpha",
       "zeta",
     ]);
   });

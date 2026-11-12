@@ -159,6 +159,7 @@ export function LinkList({ onToast }: LinkListProps) {
       onKeyDown={handleKeyDown}
     >
       <div className="link-header">
+        <div aria-hidden="true" />
         <div>名称</div>
         <div>路径</div>
         <div>修改时间</div>

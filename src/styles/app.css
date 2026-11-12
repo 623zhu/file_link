@@ -158,7 +158,7 @@ button {
 .link-header,
 .link-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1.2fr) minmax(180px, 2fr) 108px;
+  grid-template-columns: 24px minmax(140px, 1.2fr) minmax(180px, 2fr) 108px;
   gap: 8px;
   align-items: center;
   padding: 0 16px;
@@ -205,6 +205,38 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.link-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #d1d5db;
+  cursor: pointer;
+}
+
+.link-star:hover,
+.link-row:hover .link-star:not(.starred) {
+  color: #9ca3af;
+}
+
+.link-star.starred {
+  color: #d97706;
+}
+
+.link-star:focus {
+  outline: none;
+}
+
+.link-star:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }
 
 .link-name {

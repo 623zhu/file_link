@@ -212,6 +212,7 @@ fn import_one(data: &mut Data, raw: &str) -> ImportOutcome {
         sources: vec![Source::Manual],
         modified_at,
         missing: false,
+        starred: false,
     });
     ImportOutcome::Added
 }
@@ -275,6 +276,16 @@ pub fn normalize_extensions(extensions: &[String]) -> Result<Vec<String>, AppErr
 pub fn update_settings(data: &mut Data, extensions: &[String]) -> Result<Settings, AppError> {
     data.settings.extensions = normalize_extensions(extensions)?;
     Ok(data.settings.clone())
+}
+
+pub fn set_starred(data: &mut Data, id: &str, starred: bool) -> Result<(), AppError> {
+    let link = data
+        .links
+        .iter_mut()
+        .find(|link| link.id == id)
+        .ok_or(AppError::NotFound)?;
+    link.starred = starred;
+    Ok(())
 }
 
 pub fn remove_links(data: &mut Data, ids: &[String]) -> RemoveLinksResult {
@@ -917,6 +928,7 @@ mod tests {
             }],
             modified_at,
             missing: false,
+            starred: false,
         });
 
         let result = import_files(&mut data, std::slice::from_ref(&path));
@@ -971,6 +983,7 @@ mod tests {
             sources,
             modified_at: Local::now(),
             missing: false,
+            starred: false,
         }
     }
 
@@ -988,6 +1001,25 @@ mod tests {
         assert_eq!(result, RemoveLinksResult { removed: 1 });
         assert!(data.links.is_empty());
         assert!(data.ignored.is_empty());
+    }
+
+    #[test]
+    fn set_starred_updates_existing_link() {
+        let mut data = Data::default();
+        data.links
+            .push(sample_link("a", "d:\\files\\a.html", vec![Source::Manual]));
+
+        set_starred(&mut data, "a", true).unwrap();
+        assert!(data.links[0].starred);
+        set_starred(&mut data, "a", false).unwrap();
+        assert!(!data.links[0].starred);
+    }
+
+    #[test]
+    fn set_starred_missing_id_is_not_found() {
+        let mut data = Data::default();
+        let err = set_starred(&mut data, "missing", true).unwrap_err();
+        assert!(matches!(err, AppError::NotFound));
     }
 
     #[test]
@@ -1233,6 +1265,7 @@ mod tests {
             }],
             modified_at,
             missing: false,
+            starred: false,
         };
         let saved = link.clone();
         write(state, |data| {
