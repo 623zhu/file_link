@@ -7,7 +7,7 @@ import {
   type KeyboardEvent,
 } from "react";
 
-import { openLink, removeLinks } from "../api/commands";
+import { openLink, removeLinks, setStarred } from "../api/commands";
 import {
   applySelection,
   nextCursorIndex,
@@ -185,6 +185,23 @@ export function LinkList({ onToast }: LinkListProps) {
     }
   }
 
+  async function handleToggleStarSelected() {
+    const targets = visible.filter((link) => selectedIds.has(link.id));
+    if (targets.length === 0) {
+      return;
+    }
+    const starred = targets.some((link) => !link.starred);
+    try {
+      for (const link of targets) {
+        if (link.starred !== starred) {
+          await setStarred(link.id, starred);
+        }
+      }
+    } catch (err) {
+      onToast(errorMessage(err, "更新星标失败，请稍后重试"));
+    }
+  }
+
   async function handleRemoveSelected() {
     setConfirming(false);
     const ids = visibleIds.filter((id) =>
@@ -228,6 +245,14 @@ export function LinkList({ onToast }: LinkListProps) {
     ) {
       event.preventDefault();
       void handleCopySelected();
+      return;
+    }
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "d"
+    ) {
+      event.preventDefault();
+      void handleToggleStarSelected();
       return;
     }
     if (event.key === "Enter") {
