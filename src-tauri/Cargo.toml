@@ -1,6 +1,6 @@
 [package]
 name = "file-link"
-version = "0.1.0"
+version = "0.2.0"
 description = "本地文件链接管理器"
 authors = ["you"]
 edition = "2024"

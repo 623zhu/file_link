@@ -1,20 +1,20 @@
-# File Link 0.1.0
+# File Link 0.2.0
 
-免安装版：`FileLink_0.1.0_x64_portable.exe`  
-安装程序：`FileLink_0.1.0_x64-setup.exe`（当前用户安装、简体中文）
+免安装版：`FileLink_0.2.0_x64_portable.exe`  
+安装程序：`FileLink_0.2.0_x64-setup.exe`（当前用户安装、简体中文）
 
 SHA256：
 
 ```
-17F77BBED031F78B88A867D566BEB61E9DD78E620FB4BFD3470981E42B1734C8  FileLink_0.1.0_x64_portable.exe
-C8AB1389BCEB0F7C94F7098630C15B82F7A2621F1A900F87D92F3A27DA99DC05  FileLink_0.1.0_x64-setup.exe
+66C0038F0C80F8588AF2C54136EF006A9C30059ABDE966EDDFD019FED9A98FFC  FileLink_0.2.0_x64_portable.exe
+4C09915DAE14BC2C65D6FB22B74F689380C6AD42F8F7F3C18911C0B6306D6C8C  FileLink_0.2.0_x64-setup.exe
 ```
 
 也可用同目录的 `SHA256SUMS.txt` 校验：
 
 ```powershell
-Get-FileHash .\FileLink_0.1.0_x64_portable.exe -Algorithm SHA256
-Get-FileHash .\FileLink_0.1.0_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\FileLink_0.2.0_x64_portable.exe -Algorithm SHA256
+Get-FileHash .\FileLink_0.2.0_x64-setup.exe -Algorithm SHA256
 ```
 
 ## 运行要求
@@ -32,12 +32,18 @@ Get-FileHash .\FileLink_0.1.0_x64-setup.exe -Algorithm SHA256
 - 绑定文件夹后按类型规则生成链接
 - 自动导入或手动扫描新文件
 - 打开、在资源管理器中定位、移除链接（只删除链接，不删除原文件）
-- 按文件夹或文件类型浏览、多选批量操作、键盘操作、长列表虚拟滚动
+- 按文件夹或文件类型浏览、多选批量操作、长列表虚拟滚动
 - 绑定文件夹时可配置该目录的文件类型；原文件删除或移走后从列表移除链接
-- 链接可标星，已标星的条目在当前列表置顶
+- 链接可标星，已标星的条目在当前列表置顶；Ctrl+D 切换选中项星标
+- 按文件名或路径搜索全部绑定文件夹，命中文字高亮
+- 键盘：Ctrl+F 搜索、方向键选择、Ctrl+A 全选、Ctrl+C 复制路径
+- 一次打开超过 10 个文件前先确认
+- 启动时恢复上次查看的文件夹或类型，以及窗口大小和位置
+- 文件夹视图的路径列只显示相对子目录
+- 绑定文件夹内改名或移动后沿用原链接，并保留星标
 - 自定义应用图标；release 构建无控制台窗口
 - NSIS 安装程序：当前用户安装、简体中文，卸载时默认保留链接数据
-- 不提供全部链接 / 手动导入视图，不提供搜索
+- 不提供全部链接 / 手动导入视图
 
 ## 已知问题
 
