@@ -18,6 +18,7 @@ import {
   listedExtensions,
 } from "../utils/filter";
 import { folderName, isNetworkPath, NETWORK_WATCH_HINT } from "../utils/path";
+import { scanSummaryMessage } from "../utils/scan";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
@@ -70,9 +71,7 @@ export function Sidebar({ onToast }: SidebarProps) {
     setMenu(null);
     try {
       const summary = await scanBinding(binding.id);
-      onToast(
-        `新增 ${summary.added}，恢复 ${summary.restored}，移除 ${summary.removed}`,
-      );
+      onToast(scanSummaryMessage(summary));
     } catch (err) {
       onToast(errorMessage(err, "扫描失败，请确认文件夹仍可访问后重试"));
     }

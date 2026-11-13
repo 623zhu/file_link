@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { scanAll } from "../api/commands";
 import { useStore } from "../store";
 import { errorMessage } from "../utils/error";
+import { scanSummaryMessage } from "../utils/scan";
 import { BindDialog } from "./BindDialog";
 
 interface ToolbarProps {
@@ -43,9 +44,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
     setBusy(true);
     try {
       const summary = await scanAll();
-      onToast(
-        `新增 ${summary.added}，恢复 ${summary.restored}，移除 ${summary.removed}`,
-      );
+      onToast(scanSummaryMessage(summary));
     } catch (err) {
       onToast(errorMessage(err, "扫描失败，请确认绑定的文件夹仍可访问后重试"));
     } finally {
