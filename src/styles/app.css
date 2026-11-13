@@ -252,6 +252,12 @@ button {
   white-space: nowrap;
 }
 
+.search-hit {
+  border-radius: 2px;
+  background: #fde68a;
+  color: inherit;
+}
+
 .link-empty {
   padding: 32px 16px;
   color: #6b7280;

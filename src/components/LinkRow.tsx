@@ -5,10 +5,12 @@ import { openLink, revealLink, setStarred } from "../api/commands";
 import type { Link } from "../types";
 import { copyText } from "../utils/clipboard";
 import { errorMessage } from "../utils/error";
+import { splitHighlight } from "../utils/highlight";
 
 interface LinkRowProps {
   link: Link;
   pathLabel: string;
+  query: string;
   selected: boolean;
   onSelect: (event: {
     shiftKey: boolean;
@@ -28,6 +30,7 @@ interface MenuPosition {
 export function LinkRow({
   link,
   pathLabel,
+  query,
   selected,
   onSelect,
   onEnsureSelected,
@@ -139,11 +142,11 @@ export function LinkRow({
       </button>
       <div className="link-cell link-name">
         <span className="link-name-text" title={link.name}>
-          {link.name}
+          <Highlighted text={link.name} query={query} />
         </span>
       </div>
       <div className="link-cell" title={link.path}>
-        {pathLabel}
+        <Highlighted text={pathLabel} query={query} />
       </div>
       <div className="link-cell">{formatModifiedAt(link.modifiedAt)}</div>
       {menu
@@ -196,6 +199,18 @@ export function LinkRow({
           )
         : null}
     </div>
+  );
+}
+
+function Highlighted({ text, query }: { text: string; query: string }) {
+  return splitHighlight(text, query).map((part, index) =>
+    part.hit ? (
+      <mark key={index} className="search-hit">
+        {part.text}
+      </mark>
+    ) : (
+      part.text
+    ),
   );
 }
 

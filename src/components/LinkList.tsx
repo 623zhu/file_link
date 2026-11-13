@@ -306,6 +306,7 @@ export function LinkList({ onToast }: LinkListProps) {
                         ? pathInBinding(link.path, bindingPath)
                         : link.path
                     }
+                    query={query}
                     selected={selectedIds.has(link.id)}
                     onSelect={(event) => handleSelect(link.id, event)}
                     onEnsureSelected={() => handleEnsureSelected(link.id)}
