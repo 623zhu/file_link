@@ -103,13 +103,26 @@ describe("filterLinks search", () => {
       name: "report-b2.html",
       path: "D:\\b2\\report-b2.html",
     }),
+    link("manual-report", [manual], false, {
+      name: "report-manual.html",
+      path: "D:\\manual\\report-manual.html",
+    }),
   ];
 
-  it("matches names case-insensitively within the current view", () => {
+  it("matches names case-insensitively across all bindings", () => {
     expect(ids(filterLinks(searchable, view, "REPORT"))).toEqual([
       "star",
+      "elsewhere",
       "report",
     ]);
+  });
+
+  it("ignores the current view and skips manual-only links", () => {
+    const other = { type: "extension", ext: ".md" } as const;
+    expect(ids(filterLinks(searchable, other, "report"))).not.toContain(
+      "manual-report",
+    );
+    expect(ids(filterLinks(searchable, other, "b2"))).toEqual(["elsewhere"]);
   });
 
   it("matches paths", () => {

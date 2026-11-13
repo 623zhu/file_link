@@ -37,18 +37,17 @@ export function extensionLabel(ext: string): string {
 }
 
 export function filterLinks(links: Link[], view: View, query = ""): Link[] {
-  return sortLinks(filterByQuery(filterByView(links, view), query));
-}
-
-function filterByQuery(links: Link[], query: string): Link[] {
   const needle = query.trim().toLowerCase();
   if (needle.length === 0) {
-    return links;
+    return sortLinks(filterByView(links, view));
   }
-  return links.filter(
-    (link) =>
-      link.name.toLowerCase().includes(needle) ||
-      link.path.toLowerCase().includes(needle),
+  return sortLinks(
+    links.filter(
+      (link) =>
+        hasAnyBindingSource(link) &&
+        (link.name.toLowerCase().includes(needle) ||
+          link.path.toLowerCase().includes(needle)),
+    ),
   );
 }
 

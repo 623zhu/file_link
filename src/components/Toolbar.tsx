@@ -53,8 +53,8 @@ export function Toolbar({ onToast }: ToolbarProps) {
       <input
         type="search"
         value={query}
-        placeholder="搜索文件名或路径……"
-        aria-label="搜索文件名或路径"
+        placeholder="在所有文件夹中搜索文件名或路径……"
+        aria-label="在所有文件夹中搜索文件名或路径"
         onChange={(event) => useStore.setState({ query: event.target.value })}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
