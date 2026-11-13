@@ -31,7 +31,12 @@ export function LinkList({ onToast }: LinkListProps) {
   const links = useStore((state) => state.snapshot?.links) ?? EMPTY_LINKS;
   const view = useStore((state) => state.view);
   const selectedIds = useStore((state) => state.selectedIds);
-  const visible = useMemo(() => filterLinks(links, view), [links, view]);
+  const query = useStore((state) => state.query);
+  const searching = query.trim().length > 0;
+  const visible = useMemo(
+    () => filterLinks(links, view, query),
+    [links, view, query],
+  );
   const visibleIds = useMemo(() => visible.map((link) => link.id), [visible]);
   const anchorIdRef = useRef<string | null>(null);
   const listRef = useRef<HTMLElement>(null);
@@ -48,7 +53,7 @@ export function LinkList({ onToast }: LinkListProps) {
 
   useEffect(() => {
     bodyRef.current?.scrollTo(0, 0);
-  }, [view]);
+  }, [view, query]);
 
   useEffect(() => {
     const visibleSet = new Set(visibleIds);
@@ -171,7 +176,11 @@ export function LinkList({ onToast }: LinkListProps) {
       >
         {visible.length === 0 ? (
           <div className="link-empty">
-            {view.type === "none" ? "请先绑定文件夹" : "暂无链接"}
+            {view.type === "none"
+              ? "请先绑定文件夹"
+              : searching
+                ? "没有匹配的链接"
+                : "暂无链接"}
           </div>
         ) : (
           <div

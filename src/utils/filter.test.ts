@@ -83,6 +83,53 @@ describe("filterLinks", () => {
   });
 });
 
+describe("filterLinks search", () => {
+  const view = { type: "binding", id: "b1" } as const;
+  const searchable: Link[] = [
+    link("report", [binding], false, {
+      name: "Report.html",
+      path: "D:\\work\\Report.html",
+    }),
+    link("notes", [binding], false, {
+      name: "notes.html",
+      path: "D:\\Projects\\notes.html",
+    }),
+    link("star", [binding], false, {
+      name: "z-report-old.html",
+      path: "D:\\work\\z-report-old.html",
+      starred: true,
+    }),
+    link("elsewhere", [otherBinding], false, {
+      name: "report-b2.html",
+      path: "D:\\b2\\report-b2.html",
+    }),
+  ];
+
+  it("matches names case-insensitively within the current view", () => {
+    expect(ids(filterLinks(searchable, view, "REPORT"))).toEqual([
+      "star",
+      "report",
+    ]);
+  });
+
+  it("matches paths", () => {
+    expect(ids(filterLinks(searchable, view, "projects\\"))).toEqual(["notes"]);
+  });
+
+  it("trims the query and treats blank as no filter", () => {
+    expect(ids(filterLinks(searchable, view, "  notes  "))).toEqual(["notes"]);
+    expect(ids(filterLinks(searchable, view, "   "))).toEqual([
+      "star",
+      "notes",
+      "report",
+    ]);
+  });
+
+  it("returns nothing when no link matches", () => {
+    expect(filterLinks(searchable, view, "missing")).toEqual([]);
+  });
+});
+
 describe("listedExtensions", () => {
   it("lists bound extensions and ignores manual-only links", () => {
     expect(listedExtensions(links)).toEqual([".html", ".md"]);

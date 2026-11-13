@@ -36,8 +36,20 @@ export function extensionLabel(ext: string): string {
   return ext.replace(/^\./, "").toUpperCase();
 }
 
-export function filterLinks(links: Link[], view: View): Link[] {
-  return sortLinks(filterByView(links, view));
+export function filterLinks(links: Link[], view: View, query = ""): Link[] {
+  return sortLinks(filterByQuery(filterByView(links, view), query));
+}
+
+function filterByQuery(links: Link[], query: string): Link[] {
+  const needle = query.trim().toLowerCase();
+  if (needle.length === 0) {
+    return links;
+  }
+  return links.filter(
+    (link) =>
+      link.name.toLowerCase().includes(needle) ||
+      link.path.toLowerCase().includes(needle),
+  );
 }
 
 function filterByView(links: Link[], view: View): Link[] {

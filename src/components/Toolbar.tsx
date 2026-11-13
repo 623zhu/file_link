@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 
 import { scanAll } from "../api/commands";
+import { useStore } from "../store";
 import { errorMessage } from "../utils/error";
 import { BindDialog } from "./BindDialog";
 
@@ -10,6 +11,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onToast }: ToolbarProps) {
+  const query = useStore((state) => state.query);
   const [busy, setBusy] = useState(false);
   const [bindPath, setBindPath] = useState<string | null>(null);
 
@@ -48,6 +50,26 @@ export function Toolbar({ onToast }: ToolbarProps) {
         borderBottom: "1px solid #e5e7eb",
       }}
     >
+      <input
+        type="search"
+        value={query}
+        placeholder="搜索文件名或路径……"
+        aria-label="搜索文件名或路径"
+        onChange={(event) => useStore.setState({ query: event.target.value })}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            useStore.setState({ query: "" });
+          }
+        }}
+        style={{
+          flex: 1,
+          minWidth: 160,
+          height: 28,
+          padding: "0 8px",
+          border: "1px solid #e5e7eb",
+          borderRadius: 4,
+        }}
+      />
       <button type="button" disabled={busy} onClick={() => void handleBind()}>
         绑定文件夹
       </button>

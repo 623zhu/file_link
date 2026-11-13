@@ -15,6 +15,7 @@ interface Store {
   snapshot: Snapshot | null;
   view: View;
   selectedIds: Set<string>;
+  query: string;
   refresh: () => Promise<void>;
 }
 
@@ -22,6 +23,7 @@ export const useStore = create<Store>((set) => ({
   snapshot: null,
   view: { type: "none" },
   selectedIds: new Set(),
+  query: "",
   refresh: async () => {
     const snapshot = await getSnapshot();
     set((state) => ({
