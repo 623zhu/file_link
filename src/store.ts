@@ -20,9 +20,52 @@ interface Store {
   refresh: () => Promise<void>;
 }
 
+const VIEW_STORAGE_KEY = "file-link.view";
+
+export function parseStoredView(raw: string | null): View {
+  if (raw) {
+    try {
+      const value: unknown = JSON.parse(raw);
+      if (typeof value === "object" && value !== null) {
+        const item = value as Record<string, unknown>;
+        if (item.type === "binding" && typeof item.id === "string") {
+          return { type: "binding", id: item.id };
+        }
+        if (item.type === "extension" && typeof item.ext === "string") {
+          return { type: "extension", ext: item.ext };
+        }
+      }
+    } catch {
+      // fall through to "none"
+    }
+  }
+  return { type: "none" };
+}
+
+function loadStoredView(): View {
+  try {
+    return parseStoredView(
+      globalThis.localStorage?.getItem(VIEW_STORAGE_KEY) ?? null,
+    );
+  } catch {
+    return { type: "none" };
+  }
+}
+
+function saveView(view: View) {
+  if (view.type === "none") {
+    return;
+  }
+  try {
+    globalThis.localStorage?.setItem(VIEW_STORAGE_KEY, JSON.stringify(view));
+  } catch {
+    // storage unavailable; the view simply is not remembered
+  }
+}
+
 export const useStore = create<Store>((set) => ({
   snapshot: null,
-  view: { type: "none" },
+  view: loadStoredView(),
   selectedIds: new Set(),
   query: "",
   listFocusRequest: 0,
@@ -34,6 +77,12 @@ export const useStore = create<Store>((set) => ({
     }));
   },
 }));
+
+useStore.subscribe((state, previous) => {
+  if (state.view !== previous.view) {
+    saveView(state.view);
+  }
+});
 
 export type BrowseTab = "folder" | "type";
 

@@ -4,6 +4,8 @@ import {
   applySelection,
   browseTabFromView,
   nextCursorIndex,
+  parseStoredView,
+  resolveView,
   selectionModeFromEvent,
   viewForBrowseTab,
   type SelectionState,
@@ -126,6 +128,47 @@ describe("nextCursorIndex", () => {
   it("returns -1 for an empty list", () => {
     expect(nextCursorIndex(0, -1, 1)).toBe(-1);
     expect(nextCursorIndex(0, 2, -1)).toBe(-1);
+  });
+});
+
+describe("parseStoredView", () => {
+  it("restores binding and extension views", () => {
+    expect(parseStoredView('{"type":"binding","id":"b2"}')).toEqual({
+      type: "binding",
+      id: "b2",
+    });
+    expect(parseStoredView('{"type":"extension","ext":".md"}')).toEqual({
+      type: "extension",
+      ext: ".md",
+    });
+  });
+
+  it("falls back to none for missing, broken, or unknown content", () => {
+    expect(parseStoredView(null)).toEqual({ type: "none" });
+    expect(parseStoredView("{not json")).toEqual({ type: "none" });
+    expect(parseStoredView('"binding"')).toEqual({ type: "none" });
+    expect(parseStoredView('{"type":"binding","id":3}')).toEqual({
+      type: "none",
+    });
+    expect(parseStoredView('{"type":"all"}')).toEqual({ type: "none" });
+  });
+
+  it("is validated against current bindings by resolveView", () => {
+    const bindings = [
+      {
+        id: "b1",
+        path: "D:\\a",
+        key: "d:\\a",
+        recursive: false,
+        autoWatch: false,
+        extensions: [".html"],
+        ruleId: null,
+        createdAt: "2026-11-04T15:00:00+08:00",
+        unavailable: false,
+      },
+    ];
+    const stored = parseStoredView('{"type":"binding","id":"removed"}');
+    expect(resolveView(stored, bindings)).toEqual({ type: "binding", id: "b1" });
   });
 });
 
