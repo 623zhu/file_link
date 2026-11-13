@@ -23,6 +23,7 @@ import { LinkRow } from "./LinkRow";
 
 const EMPTY_LINKS: Link[] = [];
 const ROW_HEIGHT = 36;
+const OPEN_CONFIRM_THRESHOLD = 10;
 
 interface LinkListProps {
   onToast: (message: string) => void;
@@ -46,6 +47,7 @@ export function LinkList({ onToast }: LinkListProps) {
   const listRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [confirming, setConfirming] = useState(false);
+  const [confirmingOpen, setConfirmingOpen] = useState(false);
   // eslint-disable-next-line react-hooks/incompatible-library -- @tanstack/react-virtual
   const virtualizer = useVirtualizer({
     count: visible.length,
@@ -141,6 +143,7 @@ export function LinkList({ onToast }: LinkListProps) {
   }
 
   async function handleOpenSelected() {
+    setConfirmingOpen(false);
     if (selectedVisibleIds.length === 0) {
       return;
     }
@@ -179,7 +182,7 @@ export function LinkList({ onToast }: LinkListProps) {
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
-    if (confirming) {
+    if (confirming || confirmingOpen) {
       return;
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -197,7 +200,11 @@ export function LinkList({ onToast }: LinkListProps) {
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      void handleOpenSelected();
+      if (selectedVisibleIds.length > OPEN_CONFIRM_THRESHOLD) {
+        setConfirmingOpen(true);
+      } else {
+        void handleOpenSelected();
+      }
       return;
     }
     if (event.key === "Delete") {
@@ -279,6 +286,13 @@ export function LinkList({ onToast }: LinkListProps) {
         message={`从 File Link 中移除选中的 ${selectedVisibleIds.length} 个链接？只删除链接，不删除原文件。`}
         onConfirm={() => void handleRemoveSelected()}
         onCancel={() => setConfirming(false)}
+      />
+      <ConfirmDialog
+        open={confirmingOpen}
+        message={`确定要打开选中的 ${selectedVisibleIds.length} 个文件吗？`}
+        confirmLabel="打开"
+        onConfirm={() => void handleOpenSelected()}
+        onCancel={() => setConfirmingOpen(false)}
       />
     </section>
   );
