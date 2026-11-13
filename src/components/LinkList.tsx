@@ -16,6 +16,7 @@ import {
   type SelectMode,
 } from "../store";
 import type { Link } from "../types";
+import { copyText } from "../utils/clipboard";
 import { errorMessage } from "../utils/error";
 import { filterLinks } from "../utils/filter";
 import { pathInBinding } from "../utils/path";
@@ -167,6 +168,23 @@ export function LinkList({ onToast }: LinkListProps) {
     }
   }
 
+  async function handleCopySelected() {
+    const paths = visible
+      .filter((link) => selectedIds.has(link.id))
+      .map((link) => link.path);
+    if (paths.length === 0) {
+      return;
+    }
+    try {
+      await copyText(paths.join("\r\n"));
+      onToast(
+        paths.length === 1 ? "已复制路径" : `已复制 ${paths.length} 个路径`,
+      );
+    } catch {
+      onToast("复制路径失败，请重试或手动选择路径复制");
+    }
+  }
+
   async function handleRemoveSelected() {
     setConfirming(false);
     const ids = visibleIds.filter((id) =>
@@ -202,6 +220,14 @@ export function LinkList({ onToast }: LinkListProps) {
     ) {
       event.preventDefault();
       useStore.setState({ selectedIds: new Set(visibleIds) });
+      return;
+    }
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "c"
+    ) {
+      event.preventDefault();
+      void handleCopySelected();
       return;
     }
     if (event.key === "Enter") {

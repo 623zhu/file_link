@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 import { openLink, revealLink, setStarred } from "../api/commands";
 import type { Link } from "../types";
+import { copyText } from "../utils/clipboard";
 import { errorMessage } from "../utils/error";
 
 interface LinkRowProps {
@@ -221,23 +222,4 @@ function formatModifiedAt(value: string): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${month}-${day} ${hours}:${minutes}`;
-}
-
-async function copyText(value: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(value);
-    return;
-  }
-  const textarea = document.createElement("textarea");
-  textarea.value = value;
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.left = "-9999px";
-  document.body.appendChild(textarea);
-  textarea.select();
-  const copied = document.execCommand("copy");
-  textarea.remove();
-  if (!copied) {
-    throw new Error("复制失败");
-  }
 }
