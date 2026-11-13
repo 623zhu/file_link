@@ -39,6 +39,13 @@ pub fn open_link(app: AppHandle, state: State<AppState>, id: String) -> Result<(
     if service::link_has_unavailable_binding(&state, &id)? {
         return Err(AppError::BindingUnavailable);
     }
+    if let Some(path) = service::relocate_link(&state, &id)? {
+        emit_state_changed(&app)?;
+        return app
+            .opener()
+            .open_path(path, None::<&str>)
+            .map_err(open_failed);
+    }
     service::write_and_emit(&state, &app, |data| service::remove_gone_link(data, &id))?;
     Err(AppError::FileMissing)
 }
@@ -55,6 +62,13 @@ pub fn reveal_link(app: AppHandle, state: State<AppState>, id: String) -> Result
         .filter(|parent| parent.is_dir())
         .map(|parent| parent.to_string_lossy().into_owned());
     if !service::link_has_unavailable_binding(&state, &id)? {
+        if let Some(found) = service::relocate_link(&state, &id)? {
+            emit_state_changed(&app)?;
+            return app
+                .opener()
+                .reveal_item_in_dir(Path::new(&found))
+                .map_err(open_failed);
+        }
         service::write_and_emit(&state, &app, |data| service::remove_gone_link(data, &id))?;
     }
     if let Some(parent) = parent {

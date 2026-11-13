@@ -251,6 +251,51 @@ pub fn link_has_unavailable_binding(state: &AppState, id: &str) -> Result<bool, 
     }))
 }
 
+/// 原文件不在时，在该 link 的绑定目录中按改名规则找回；找回后返回新路径。
+pub fn relocate_link(state: &AppState, id: &str) -> Result<Option<String>, AppError> {
+    let (bindings, settings) = {
+        let data = lock(&state.data)?;
+        let link = data
+            .links
+            .iter()
+            .find(|link| link.id == id)
+            .ok_or(AppError::NotFound)?;
+        let bindings: Vec<Binding> = data
+            .bindings
+            .iter()
+            .filter(|binding| {
+                !binding.unavailable
+                    && link.has_source(&Source::Binding {
+                        binding_id: binding.id.clone(),
+                    })
+            })
+            .cloned()
+            .collect();
+        (bindings, data.settings.clone())
+    };
+
+    for binding in bindings {
+        let Ok(files) = scan_files(&binding, &settings) else {
+            continue;
+        };
+        let mut data = lock(&state.data)?;
+        let mut next = data.clone();
+        if !reconcile::relocate(&mut next, &binding.id, &files, file_exists, id) {
+            continue;
+        }
+        store::save(&state.data_path, &next)?;
+        *data = next;
+        let path = data
+            .links
+            .iter()
+            .find(|link| link.id == id)
+            .map(|link| link.path.clone());
+        log::info!("relocated link {id} to {path:?}");
+        return Ok(path);
+    }
+    Ok(None)
+}
+
 pub fn normalize_extensions(extensions: &[String]) -> Result<Vec<String>, AppError> {
     let mut normalized = Vec::new();
     let mut seen = HashSet::new();
@@ -788,6 +833,44 @@ mod tests {
         auto_watch: bool,
     ) -> AddBindingResult {
         add_binding(state, path.as_ref(), recursive, auto_watch, &html_exts()).unwrap()
+    }
+
+    #[test]
+    fn relocate_link_finds_renamed_file_without_importing_others() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = write_html(dir.path(), "old.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        add_html(&state, dir.path().to_string_lossy(), false, false);
+        let id = snapshot(&state).unwrap().links[0].id.clone();
+        set_starred(&mut lock(&state.data).unwrap(), &id, true).unwrap();
+
+        fs::rename(&old, dir.path().join("new.html")).unwrap();
+        write_html(dir.path(), "other.html");
+        let found = relocate_link(&state, &id).unwrap().expect("relocated");
+
+        let snap = snapshot(&state).unwrap();
+        assert_eq!(snap.links.len(), 1);
+        let link = &snap.links[0];
+        assert_eq!(link.id, id);
+        assert!(link.starred);
+        assert_eq!(link.name, "new.html");
+        assert_eq!(found, link.path);
+        let saved = store::load(&state.data_path).unwrap().data;
+        assert_eq!(saved.links[0].path, link.path);
+    }
+
+    #[test]
+    fn relocate_link_returns_none_when_file_is_really_gone() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = write_html(dir.path(), "old.html");
+        let (_data_dir, state) = temp_state(Data::default());
+        add_html(&state, dir.path().to_string_lossy(), false, false);
+        let id = snapshot(&state).unwrap().links[0].id.clone();
+
+        fs::remove_file(&old).unwrap();
+
+        assert_eq!(relocate_link(&state, &id).unwrap(), None);
+        assert_eq!(snapshot(&state).unwrap().links.len(), 1);
     }
 
     #[test]

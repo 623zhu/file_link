@@ -47,30 +47,12 @@ pub fn reconcile(
         }
     }
 
-    let gone: Vec<usize> = data
-        .links
-        .iter()
-        .enumerate()
-        .filter(|(_, link)| {
-            link.has_source(&source)
-                && !scanned_keys.contains(link.key.as_str())
-                && !exists(&link.path)
-        })
-        .map(|(index, _)| index)
-        .collect();
+    let gone = gone_links(data, &source, &scanned_keys, exists);
 
     let mut renamed_links = HashSet::new();
     let mut renamed_files = HashSet::new();
     for (link_index, file_index) in pair_renames(&data.links, &gone, &new_files) {
-        let (display, key, mtime) = &new_files[file_index];
-        let link = &mut data.links[link_index];
-        link.path = (*display).clone();
-        link.key = (*key).clone();
-        link.name = file_name(display);
-        if let Some(mtime) = mtime {
-            link.modified_at = *mtime;
-        }
-        link.missing = false;
+        apply_rename(&mut data.links[link_index], &new_files[file_index]);
         renamed_links.insert(link_index);
         renamed_files.insert(file_index);
     }
@@ -101,6 +83,69 @@ pub fn reconcile(
     }
 
     summary
+}
+
+/// Moves only the link `link_id` to its renamed file, using the same pairing as
+/// `reconcile`. Other new files are not imported and other links are untouched.
+pub fn relocate(
+    data: &mut Data,
+    binding_id: &str,
+    files: &[(String, String)],
+    exists: impl Fn(&str) -> bool,
+    link_id: &str,
+) -> bool {
+    let source = Source::Binding {
+        binding_id: binding_id.to_string(),
+    };
+    let scanned_keys: HashSet<&str> = files.iter().map(|(_, key)| key.as_str()).collect();
+    let new_files: Vec<_> = files
+        .iter()
+        .filter(|(_, key)| {
+            !is_ignored(data, binding_id, key) && !data.links.iter().any(|link| link.key == *key)
+        })
+        .map(|(display, key)| (display, key, path::try_file_modified_at(display)))
+        .collect();
+    let gone = gone_links(data, &source, &scanned_keys, exists);
+
+    let Some((link_index, file_index)) = pair_renames(&data.links, &gone, &new_files)
+        .into_iter()
+        .find(|(index, _)| data.links[*index].id == link_id)
+    else {
+        return false;
+    };
+    apply_rename(&mut data.links[link_index], &new_files[file_index]);
+    true
+}
+
+fn gone_links(
+    data: &Data,
+    source: &Source,
+    scanned_keys: &HashSet<&str>,
+    exists: impl Fn(&str) -> bool,
+) -> Vec<usize> {
+    data.links
+        .iter()
+        .enumerate()
+        .filter(|(_, link)| {
+            link.has_source(source)
+                && !scanned_keys.contains(link.key.as_str())
+                && !exists(&link.path)
+        })
+        .map(|(index, _)| index)
+        .collect()
+}
+
+fn apply_rename(
+    link: &mut Link,
+    (display, key, mtime): &(&String, &String, Option<DateTime<Local>>),
+) {
+    link.path = (*display).clone();
+    link.key = (*key).clone();
+    link.name = file_name(display);
+    if let Some(mtime) = mtime {
+        link.modified_at = *mtime;
+    }
+    link.missing = false;
 }
 
 /// NTFS keeps the modified time on same-volume renames and moves, so a gone
@@ -335,6 +380,47 @@ mod tests {
         assert!(link.starred);
         assert_eq!(link.path, display);
         assert_eq!(link.key, key);
+        assert_eq!(link.name, "new.html");
+    }
+
+    #[test]
+    fn relocate_moves_only_the_requested_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let old_path = dir.path().join("old.html");
+        fs::write(&old_path, "ok").unwrap();
+        let mut data = Data::default();
+        reconcile(
+            &mut data,
+            BINDING,
+            &[crate::core::path::normalize(&old_path).unwrap()],
+            path_exists,
+        );
+        data.links[0].starred = true;
+        let id = data.links[0].id.clone();
+
+        let new_path = dir.path().join("new.html");
+        fs::rename(&old_path, &new_path).unwrap();
+        let other_path = dir.path().join("other.html");
+        fs::write(&other_path, "other").unwrap();
+        let files = [
+            crate::core::path::normalize(&new_path).unwrap(),
+            crate::core::path::normalize(&other_path).unwrap(),
+        ];
+
+        assert!(!relocate(
+            &mut data,
+            BINDING,
+            &files,
+            path_exists,
+            "unknown"
+        ));
+        assert!(relocate(&mut data, BINDING, &files, path_exists, &id));
+
+        assert_eq!(data.links.len(), 1);
+        let link = &data.links[0];
+        assert_eq!(link.id, id);
+        assert!(link.starred);
+        assert_eq!(link.path, files[0].0);
         assert_eq!(link.name, "new.html");
     }
 
