@@ -10,6 +10,7 @@ import {
 import { openLink, removeLinks } from "../api/commands";
 import {
   applySelection,
+  nextCursorIndex,
   selectionModeFromEvent,
   useStore,
   type SelectMode,
@@ -38,7 +39,10 @@ export function LinkList({ onToast }: LinkListProps) {
     [links, view, query],
   );
   const visibleIds = useMemo(() => visible.map((link) => link.id), [visible]);
+  const listFocusRequest = useStore((state) => state.listFocusRequest);
+  const handledFocusRequestRef = useRef(0);
   const anchorIdRef = useRef<string | null>(null);
+  const cursorIdRef = useRef<string | null>(null);
   const listRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const [confirming, setConfirming] = useState(false);
@@ -70,7 +74,27 @@ export function LinkList({ onToast }: LinkListProps) {
     if (anchorIdRef.current && !visibleSet.has(anchorIdRef.current)) {
       anchorIdRef.current = next.size > 0 ? [...next][next.size - 1] : null;
     }
+    if (cursorIdRef.current && !visibleSet.has(cursorIdRef.current)) {
+      cursorIdRef.current = anchorIdRef.current;
+    }
   }, [visibleIds]);
+
+  useEffect(() => {
+    if (listFocusRequest === handledFocusRequestRef.current) {
+      return;
+    }
+    handledFocusRequestRef.current = listFocusRequest;
+    listRef.current?.focus();
+    const first = visibleIds[0];
+    const current = useStore.getState().selectedIds;
+    if (!first || visibleIds.some((id) => current.has(id))) {
+      return;
+    }
+    anchorIdRef.current = first;
+    cursorIdRef.current = first;
+    useStore.setState({ selectedIds: new Set([first]) });
+    bodyRef.current?.scrollTo(0, 0);
+  }, [listFocusRequest, visibleIds]);
 
   const selectedVisibleIds = visibleIds.filter((id) => selectedIds.has(id));
 
@@ -81,8 +105,24 @@ export function LinkList({ onToast }: LinkListProps) {
     };
     const next = applySelection(current, visibleIds, id, mode);
     anchorIdRef.current = next.anchorId;
+    cursorIdRef.current = id;
     useStore.setState({ selectedIds: next.selectedIds });
     listRef.current?.focus();
+  }
+
+  function moveCursor(delta: number, extend: boolean) {
+    const cursor = cursorIdRef.current;
+    const index = nextCursorIndex(
+      visibleIds.length,
+      cursor ? visibleIds.indexOf(cursor) : -1,
+      delta,
+    );
+    const id = visibleIds[index];
+    if (!id) {
+      return;
+    }
+    applySelect(id, extend ? "range" : "replace");
+    virtualizer.scrollToIndex(index, { align: "auto" });
   }
 
   function handleSelect(
@@ -140,6 +180,19 @@ export function LinkList({ onToast }: LinkListProps) {
 
   function handleKeyDown(event: KeyboardEvent<HTMLElement>) {
     if (confirming) {
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveCursor(event.key === "ArrowDown" ? 1 : -1, event.shiftKey);
+      return;
+    }
+    if (
+      (event.ctrlKey || event.metaKey) &&
+      event.key.toLowerCase() === "a"
+    ) {
+      event.preventDefault();
+      useStore.setState({ selectedIds: new Set(visibleIds) });
       return;
     }
     if (event.key === "Enter") {

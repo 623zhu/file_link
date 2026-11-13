@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   applySelection,
   browseTabFromView,
+  nextCursorIndex,
   selectionModeFromEvent,
   viewForBrowseTab,
   type SelectionState,
@@ -106,6 +107,25 @@ describe("applySelection", () => {
     const next = applySelection(current, ids, "missing", "toggle");
     expect(selectedOf(next)).toEqual(["a"]);
     expect(next.anchorId).toBe("a");
+  });
+});
+
+describe("nextCursorIndex", () => {
+  it("moves by one and stops at both ends", () => {
+    expect(nextCursorIndex(4, 1, 1)).toBe(2);
+    expect(nextCursorIndex(4, 1, -1)).toBe(0);
+    expect(nextCursorIndex(4, 0, -1)).toBe(0);
+    expect(nextCursorIndex(4, 3, 1)).toBe(3);
+  });
+
+  it("starts from the first or last row when there is no cursor", () => {
+    expect(nextCursorIndex(4, -1, 1)).toBe(0);
+    expect(nextCursorIndex(4, -1, -1)).toBe(3);
+  });
+
+  it("returns -1 for an empty list", () => {
+    expect(nextCursorIndex(0, -1, 1)).toBe(-1);
+    expect(nextCursorIndex(0, 2, -1)).toBe(-1);
   });
 });
 

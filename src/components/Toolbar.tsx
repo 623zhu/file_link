@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { scanAll } from "../api/commands";
 import { useStore } from "../store";
@@ -12,8 +12,21 @@ interface ToolbarProps {
 
 export function Toolbar({ onToast }: ToolbarProps) {
   const query = useStore((state) => state.query);
+  const searchRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [bindPath, setBindPath] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   async function handleBind() {
     const selected = await open({
@@ -51,6 +64,7 @@ export function Toolbar({ onToast }: ToolbarProps) {
       }}
     >
       <input
+        ref={searchRef}
         type="search"
         value={query}
         placeholder="在所有文件夹中搜索文件名或路径……"
@@ -59,6 +73,11 @@ export function Toolbar({ onToast }: ToolbarProps) {
         onKeyDown={(event) => {
           if (event.key === "Escape") {
             useStore.setState({ query: "" });
+          } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            useStore.setState((state) => ({
+              listFocusRequest: state.listFocusRequest + 1,
+            }));
           }
         }}
         style={{

@@ -16,6 +16,7 @@ interface Store {
   view: View;
   selectedIds: Set<string>;
   query: string;
+  listFocusRequest: number;
   refresh: () => Promise<void>;
 }
 
@@ -24,6 +25,7 @@ export const useStore = create<Store>((set) => ({
   view: { type: "none" },
   selectedIds: new Set(),
   query: "",
+  listFocusRequest: 0,
   refresh: async () => {
     const snapshot = await getSnapshot();
     set((state) => ({
@@ -99,6 +101,20 @@ export function selectionModeFromEvent(event: {
     return "toggle";
   }
   return "replace";
+}
+
+export function nextCursorIndex(
+  length: number,
+  current: number,
+  delta: number,
+): number {
+  if (length === 0) {
+    return -1;
+  }
+  if (current < 0) {
+    return delta > 0 ? 0 : length - 1;
+  }
+  return Math.min(Math.max(current + delta, 0), length - 1);
 }
 
 export function applySelection(
