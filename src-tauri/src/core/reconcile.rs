@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use chrono::{DateTime, Local};
 use serde::Serialize;
 use uuid::Uuid;
 
@@ -26,6 +27,7 @@ pub fn reconcile(
         binding_id: binding_id.to_string(),
     };
     let scanned_keys: HashSet<&str> = files.iter().map(|(_, key)| key.as_str()).collect();
+    let mut new_files = Vec::new();
 
     for (display, key) in files {
         if is_ignored(data, binding_id, key) {
@@ -41,32 +43,96 @@ pub fn reconcile(
                 summary.restored += 1;
             }
         } else {
-            data.links.push(Link {
-                id: Uuid::new_v4().to_string(),
-                path: display.clone(),
-                key: key.clone(),
-                name: file_name(display),
-                sources: vec![source.clone()],
-                modified_at: path::file_modified_at(display),
-                missing: false,
-                starred: false,
-            });
-            summary.added += 1;
+            new_files.push((display, key, path::try_file_modified_at(display)));
         }
     }
 
-    data.links.retain(|link| {
-        if !link.has_source(&source) {
-            return true;
+    let gone: Vec<usize> = data
+        .links
+        .iter()
+        .enumerate()
+        .filter(|(_, link)| {
+            link.has_source(&source)
+                && !scanned_keys.contains(link.key.as_str())
+                && !exists(&link.path)
+        })
+        .map(|(index, _)| index)
+        .collect();
+
+    let mut renamed_links = HashSet::new();
+    let mut renamed_files = HashSet::new();
+    for (link_index, file_index) in pair_renames(&data.links, &gone, &new_files) {
+        let (display, key, mtime) = &new_files[file_index];
+        let link = &mut data.links[link_index];
+        link.path = (*display).clone();
+        link.key = (*key).clone();
+        link.name = file_name(display);
+        if let Some(mtime) = mtime {
+            link.modified_at = *mtime;
         }
-        if scanned_keys.contains(link.key.as_str()) || exists(&link.path) {
-            return true;
+        link.missing = false;
+        renamed_links.insert(link_index);
+        renamed_files.insert(file_index);
+    }
+
+    let remove_ids: HashSet<String> = gone
+        .iter()
+        .filter(|index| !renamed_links.contains(*index))
+        .map(|index| data.links[*index].id.clone())
+        .collect();
+    summary.removed = remove_ids.len();
+    data.links.retain(|link| !remove_ids.contains(&link.id));
+
+    for (file_index, (display, key, mtime)) in new_files.into_iter().enumerate() {
+        if renamed_files.contains(&file_index) {
+            continue;
         }
-        summary.removed += 1;
-        false
-    });
+        data.links.push(Link {
+            id: Uuid::new_v4().to_string(),
+            path: display.clone(),
+            key: key.clone(),
+            name: file_name(display),
+            sources: vec![source.clone()],
+            modified_at: mtime.unwrap_or_else(Local::now),
+            missing: false,
+            starred: false,
+        });
+        summary.added += 1;
+    }
 
     summary
+}
+
+/// NTFS keeps the modified time on same-volume renames and moves, so a gone
+/// link and a new file sharing it exactly are treated as the same file.
+/// Times claimed by more than one link or file are left unpaired.
+fn pair_renames(
+    links: &[Link],
+    gone: &[usize],
+    new_files: &[(&String, &String, Option<DateTime<Local>>)],
+) -> Vec<(usize, usize)> {
+    let mut by_time: HashMap<DateTime<Local>, (Vec<usize>, Vec<usize>)> = HashMap::new();
+    for &index in gone {
+        by_time
+            .entry(links[index].modified_at)
+            .or_default()
+            .0
+            .push(index);
+    }
+    for (index, (_, _, mtime)) in new_files.iter().enumerate() {
+        if let Some(entry) = mtime.and_then(|mtime| by_time.get_mut(&mtime)) {
+            entry.1.push(index);
+        }
+    }
+    by_time
+        .into_values()
+        .filter_map(
+            |(links, files)| match (links.as_slice(), files.as_slice()) {
+                ([link], [file]) => Some((*link, *file)),
+                _ => None,
+            },
+        )
+        .collect()
 }
 
 pub fn remove_gone(data: &mut Data, exists: impl Fn(&str) -> bool) -> usize {
@@ -230,6 +296,76 @@ mod tests {
 
         assert_eq!(data.links.len(), 1);
         assert!(data.links[0].starred);
+    }
+
+    fn path_exists(path: &str) -> bool {
+        std::path::Path::new(path).exists()
+    }
+
+    #[test]
+    fn renamed_file_keeps_link_and_star() {
+        let dir = tempfile::tempdir().unwrap();
+        let old_path = dir.path().join("old.html");
+        fs::write(&old_path, "ok").unwrap();
+        let mut data = Data::default();
+        reconcile(
+            &mut data,
+            BINDING,
+            &[crate::core::path::normalize(&old_path).unwrap()],
+            path_exists,
+        );
+        data.links[0].starred = true;
+        let id = data.links[0].id.clone();
+
+        fs::create_dir(dir.path().join("sub")).unwrap();
+        let new_path = dir.path().join("sub").join("new.html");
+        fs::rename(&old_path, &new_path).unwrap();
+        let (display, key) = crate::core::path::normalize(&new_path).unwrap();
+        let summary = reconcile(
+            &mut data,
+            BINDING,
+            &[(display.clone(), key.clone())],
+            path_exists,
+        );
+
+        assert_eq!(summary, ReconcileSummary::default());
+        assert_eq!(data.links.len(), 1);
+        let link = &data.links[0];
+        assert_eq!(link.id, id);
+        assert!(link.starred);
+        assert_eq!(link.path, display);
+        assert_eq!(link.key, key);
+        assert_eq!(link.name, "new.html");
+    }
+
+    #[test]
+    fn ambiguous_rename_is_treated_as_remove_and_add() {
+        let dir = tempfile::tempdir().unwrap();
+        let new_path = dir.path().join("new.html");
+        fs::write(&new_path, "ok").unwrap();
+        let (display, key) = crate::core::path::normalize(&new_path).unwrap();
+        let mtime = crate::core::path::file_modified_at(&display);
+        let mut data = Data::default();
+        for name in ["a.html", "b.html"] {
+            let mut gone = link(name, vec![binding_source(BINDING)], false);
+            gone.modified_at = mtime;
+            gone.starred = true;
+            data.links.push(gone);
+        }
+
+        let summary = reconcile(&mut data, BINDING, &[(display, key)], path_exists);
+
+        assert_eq!(
+            summary,
+            ReconcileSummary {
+                added: 1,
+                restored: 0,
+                removed: 2
+            }
+        );
+        assert_eq!(data.links.len(), 1);
+        assert_eq!(data.links[0].name, "new.html");
+        assert!(!data.links[0].starred);
     }
 
     #[test]
