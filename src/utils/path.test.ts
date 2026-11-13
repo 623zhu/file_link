@@ -5,6 +5,7 @@ import {
   folderName,
   isNetworkPath,
   NETWORK_WATCH_HINT,
+  pathInBinding,
 } from "./path";
 
 describe("isNetworkPath", () => {
@@ -25,6 +26,40 @@ describe("folderName", () => {
   it("returns the last path segment", () => {
     expect(folderName("D:\\notes\\tools")).toBe("tools");
     expect(folderName("\\\\server\\share\\report")).toBe("report");
+  });
+});
+
+describe("pathInBinding", () => {
+  const binding = "D:\\work\\tools";
+
+  it("shows the binding name with the sub folder", () => {
+    expect(pathInBinding("D:\\work\\tools\\docs\\api\\a.html", binding)).toBe(
+      "tools\\docs\\api",
+    );
+  });
+
+  it("shows only the binding name for files at its root", () => {
+    expect(pathInBinding("D:\\work\\tools\\a.html", binding)).toBe("tools");
+  });
+
+  it("matches the prefix case-insensitively", () => {
+    expect(pathInBinding("d:\\WORK\\Tools\\docs\\a.html", binding)).toBe(
+      "tools\\docs",
+    );
+  });
+
+  it("handles a drive root binding", () => {
+    expect(pathInBinding("C:\\a.html", "C:\\")).toBe("C:");
+    expect(pathInBinding("C:\\docs\\a.html", "C:\\")).toBe("C:\\docs");
+  });
+
+  it("keeps the full path outside the binding", () => {
+    expect(pathInBinding("D:\\work\\toolsx\\a.html", binding)).toBe(
+      "D:\\work\\toolsx\\a.html",
+    );
+    expect(pathInBinding("E:\\other\\a.html", binding)).toBe(
+      "E:\\other\\a.html",
+    );
   });
 });
 

@@ -18,6 +18,7 @@ import {
 import type { Link } from "../types";
 import { errorMessage } from "../utils/error";
 import { filterLinks } from "../utils/filter";
+import { pathInBinding } from "../utils/path";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LinkRow } from "./LinkRow";
 
@@ -35,6 +36,11 @@ export function LinkList({ onToast }: LinkListProps) {
   const selectedIds = useStore((state) => state.selectedIds);
   const query = useStore((state) => state.query);
   const searching = query.trim().length > 0;
+  const bindings = useStore((state) => state.snapshot?.bindings);
+  const bindingPath =
+    !searching && view.type === "binding"
+      ? bindings?.find((binding) => binding.id === view.id)?.path
+      : undefined;
   const visible = useMemo(
     () => filterLinks(links, view, query),
     [links, view, query],
@@ -269,6 +275,11 @@ export function LinkList({ onToast }: LinkListProps) {
                 >
                   <LinkRow
                     link={link}
+                    pathLabel={
+                      bindingPath
+                        ? pathInBinding(link.path, bindingPath)
+                        : link.path
+                    }
                     selected={selectedIds.has(link.id)}
                     onSelect={(event) => handleSelect(link.id, event)}
                     onEnsureSelected={() => handleEnsureSelected(link.id)}

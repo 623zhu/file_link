@@ -17,6 +17,17 @@ export function folderName(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
+export function pathInBinding(path: string, bindingPath: string): string {
+  const prefix = `${bindingPath.replace(/[\\/]+$/, "")}\\`;
+  if (!path.toLowerCase().startsWith(prefix.toLowerCase())) {
+    return path;
+  }
+  const rest = path.slice(prefix.length);
+  const slash = rest.lastIndexOf("\\");
+  const name = folderName(bindingPath);
+  return slash >= 0 ? `${name}\\${rest.slice(0, slash)}` : name;
+}
+
 export function autoImportedMessage(
   bindingPath: string | undefined,
   added: number,

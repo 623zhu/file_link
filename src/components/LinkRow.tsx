@@ -7,6 +7,7 @@ import { errorMessage } from "../utils/error";
 
 interface LinkRowProps {
   link: Link;
+  pathLabel: string;
   selected: boolean;
   onSelect: (event: {
     shiftKey: boolean;
@@ -25,6 +26,7 @@ interface MenuPosition {
 
 export function LinkRow({
   link,
+  pathLabel,
   selected,
   onSelect,
   onEnsureSelected,
@@ -140,7 +142,7 @@ export function LinkRow({
         </span>
       </div>
       <div className="link-cell" title={link.path}>
-        {link.path}
+        {pathLabel}
       </div>
       <div className="link-cell">{formatModifiedAt(link.modifiedAt)}</div>
       {menu
